@@ -7,7 +7,7 @@
 <!-- 自訂 favicon（本專案不套 SELA logo，使用專屬可愛標記）。相對路徑：GitHub Pages 子路徑安全（坑 #39） -->
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="manifest" href="site.webmanifest" />
-<meta name="theme-color" content="#FF8FAB" />
+<meta name="theme-color" content="#54B9EC" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -28,22 +28,22 @@
 <script type="text/babel">
 const { useState } = React;
 
-const VERSION = "V0.2.0";
+const VERSION = "V0.2.2";
 
 /* ====================================================================== */
 /*  ★★★ 唯一需要你修改的地方:把下面換成你的 Railway 後端網址 ★★★         */
 /*  例如:"https://chengyu-magic.up.railway.app"                          */
-/*  (Railway 專案的 root directory 設為 backend/)                        */
+/*  (後端檔案在 repo 根目錄,Railway 免設 Root Directory)                 */
 /* ====================================================================== */
 const BACKEND_URL = "https://YOUR-APP.up.railway.app";
 
 /* 精靈「外觀」設定（人格 prompt 放在後端,前端只負責顯示） */
 const SPIRITS = {
-  nini: { name:"尼尼", tag:"溫柔引導", color:"#FF8FAB", soft:"#FFE3EC", deep:"#C9446E",
+  nini: { name:"尼尼", tag:"溫柔引導", color:"#FF8FB3", soft:"#FFE4EE", deep:"#C84B77",
     intro:"尼尼會溫柔地聽你說話。寫錯也沒有關係,我們一起慢慢找出好玩、漂亮的句子!" },
-  kiki: { name:"奇奇", tag:"博學小老師", color:"#4ECDC4", soft:"#D9F7F4", deep:"#1F8A82",
+  kiki: { name:"奇奇", tag:"博學小老師", color:"#54B9EC", soft:"#DCF1FC", deep:"#1E7BB0",
     intro:"奇奇知道很多成語的小故事!把句子交給我,我會告訴你每個成語從哪裡來。" },
-  max:  { name:"麥克斯", tag:"活力滿點", color:"#FFB627", soft:"#FFF0CC", deep:"#C97E00",
+  max:  { name:"麥克斯", tag:"活力滿點", color:"#8AA0F2", soft:"#E7ECFF", deep:"#4756B5",
     intro:"麥克斯超有活力!我們一起把無聊的句子,變成超酷的成語魔法吧!" },
 };
 const MODES = {
@@ -250,7 +250,7 @@ function App() {
 /* 跨平台中文字型 fallback chain（kit 靜態頁示範 5.4） */
 const baseFont = "'Noto Sans TC', system-ui, -apple-system, 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans CJK TC', 'Segoe UI', sans-serif";
 const S = {
-  root:{ fontFamily:baseFont, background:"radial-gradient(120% 120% at 50% 0%, #FFF6EC 0%, #FDEDF3 60%, #F3ECFB 100%)", minHeight:"100vh", padding:"18px 12px 28px", boxSizing:"border-box" },
+  root:{ fontFamily:baseFont, background:"radial-gradient(120% 120% at 50% 0%, #E6F5FF 0%, #F1FAFF 38%, #FFEFF6 100%)", minHeight:"100vh", padding:"18px 12px 28px", boxSizing:"border-box" },
   shell:{ maxWidth:460, margin:"0 auto" },
   tabs:{ display:"flex", gap:6, background:"rgba(255,255,255,0.5)", padding:5, borderRadius:18, marginBottom:16 },
   tab:{ flex:1, border:"none", borderRadius:14, padding:"10px 8px", fontFamily:baseFont, fontWeight:700, fontSize:15, cursor:"pointer", transition:"all .2s" },

@@ -9,18 +9,18 @@
 ## ⚠ Kit 衝突仲裁(開頭必讀)
 
 1. **本專案經 SELA 明確指示「不套用 SELA logo」**(兒童公開產品定位)。Kit 鐵律雖規定全新專案一律套 logo,但 Kit CLAUDE.md 第 9 條「用戶說的話與指南衝突 → 以用戶為準」優先。**請勿主動補上 SELA logo / favicon 套組**,除非 SELA 主動要求。
-2. **配色保留現有兒童活潑色系**(尼尼粉 `#FF8FAB` / 奇奇青 `#4ECDC4` / 麥克斯黃 `#FFB627`),已符合 colors.md「兒童類依向性自訂」。配色決策權在 SELA,不主動提案改色。
+2. **配色由 SELA 於 V0.2.1 指定為「輕爽天藍 + 粉色系」**(尼尼粉 `#FF8FB3` / 奇奇天藍 `#54B9EC` / 麥克斯薰衣草藍紫 `#8AA0F2`;主題色/背景以天藍為主漸層到淡粉),符合 colors.md「兒童類依向性自訂」。配色決策權在 SELA,不主動提案改色。
 3. 完成版本前走鐵律 #0(SELA-handoff 評估)。
 
 ---
 
 ## 〇、當前狀態
 
-- **版本:** V0.2.0
+- **版本:** V0.2.2
 - **狀態:** 可運作(前端 + 後端皆完成,兒童安全把關已上,待實際部署填入 BACKEND_URL)
 - **一句話定位:** 給國小學生的 AI 寫作小幫手——把普通句子變成含成語/感官描寫的句子,三精靈不同語氣;英文品牌名 WordWand,中文功能名成語魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
-- **入口點:** 前端 `docs/index.html` 的 `App()`;後端 `backend/main.py` 的 `app`(`POST /magic`)
+- **入口點:** 前端 `docs/index.html` 的 `App()`;後端 `main.py`(repo 根目錄)的 `app`(`POST /magic`)
 
 ---
 
@@ -30,7 +30,7 @@
 |------|--------|------------|
 | 靜態前端 + 後端代理分離 | 純靜態單檔 / 純後端 SSR | API key 服務多名使用者必須藏後端,不能放前端;前端內容簡單適合零成本 GitHub Pages |
 | React via CDN + Babel | Vite/CRA build | 兒童小工具規模小,免建置最省事,Git Pusher 推一份就能上 Pages |
-| FastAPI(Railway) | Flask / 直連 Anthropic | 既有熟悉棧;伺服器端組 prompt 可限制用途、防 key 被盜用 |
+| FastAPI(Railway,後端檔案放 repo 根目錄) | Flask / 直連 Anthropic | 既有熟悉棧;伺服器端組 prompt 可限制用途、防 key 被盜用 |
 | Haiku 模型 | Sonnet | 改寫任務簡單,Haiku 便宜快速;品質不夠再換 `claude-sonnet-4-6` |
 
 > 改技術棧 = 大版本升級。
@@ -49,12 +49,12 @@
 |---------|---------|
 | 後端網址(部署必改) | `docs/index.html` 開頭 `BACKEND_URL` |
 | 精靈外觀(名稱/配色/介紹) | `docs/index.html` 的 `SPIRITS` 物件 |
-| 精靈人格語氣 | `backend/main.py` 的 `PERSONAS`(改這裡才會變語氣,前端只是顯示) |
+| 精靈人格語氣 | `main.py` 的 `PERSONAS`(改這裡才會變語氣,前端只是顯示) |
 | 模式(成語/五官)說明與範例 | `docs/index.html` 的 `MODES` |
-| AI 任務指令 / 回傳格式 | `backend/main.py` 的 `TASKS` / `SCHEMA_OK` |
-| 兒童安全規則(範圍鎖定 + 內容把關) | `backend/main.py` 的 `SAFETY` 常數(放 prompt 最前面,最優先) |
+| AI 任務指令 / 回傳格式 | `main.py` 的 `TASKS` / `SCHEMA_OK` |
+| 兒童安全規則(範圍鎖定 + 內容把關) | `main.py` 的 `SAFETY` 常數(放 prompt 最前面,最優先) |
 | ok=false 引導畫面 | `docs/index.html` 結果區「result.ok === false」分支 |
-| 模型、單句長度上限 | `backend/main.py` 的 `MODEL` / `len(text) > 200` |
+| 模型、單句長度上限 | `main.py` 的 `MODEL` / `len(text) > 200` |
 | 介面樣式 | `docs/index.html` 結尾的 `S` 樣式物件 |
 
 > **契約提醒:** 前端送 `{spirit, mode, text}`;後端回 `{ok:true, upgraded, items[], cheer}` 或 `{ok:false, redirect}`。前端依 `ok` 分流渲染,改欄位名兩邊要同改。
@@ -92,7 +92,13 @@ P4. (種子,坑 #13/SW)前端跨域呼叫第三方被擋
    - 原因:把關放前端等於沒把關
    - 做法:`SAFETY` 放後端 prompt 最前面(最優先);模型回 `ok` 旗標;後端再保險一次——非明確 `ok===true` 一律當不通過回安全引導語(寧可錯殺、不可漏放)
 
-(遇到專屬新坑時起編 #1)
+**真正踩到的坑（起編 #1）：**
+
+1. **Railway 把後端放子資料夾 → Railpack 在 repo 根目錄找不到 requirements.txt,build 失敗**
+   - 症狀:Railway build 報「Railpack could not determine how to build the app」,還列出一堆支援語言
+   - 原因:後端原本在 `backend/`,但 Railway 預設從 repo 根目錄分析;根目錄只有資料夾沒有 `requirements.txt`,認不出是 Python
+   - 做法:兩條路擇一——(A) Railway 服務 Settings → Build → Root Directory 設 `backend`;(B) 直接把後端檔放 repo 根目錄。本專案 V0.2.2 採 (B),最省事、免設定
+   - 通用性:任何 monorepo / 多資料夾 repo 部署到 Railway 都會遇到
 
 ---
 
@@ -127,6 +133,8 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 |------|------|
 | V0.1.0 | 初版:三精靈、成語/五官兩模式、GitHub Pages + Railway 雙端架構、不套 SELA logo |
 | V0.2.0 | 取英文品牌名 WordWand;加兒童安全把關(範圍鎖定只做作文 + 內容把關 G 級,後端 ok 旗標 + fail-safe) |
+| V0.2.1 | 配色微調:SELA 指定改為輕爽天藍 + 粉色系(尼尼粉 / 奇奇天藍 / 麥克斯薰衣草藍紫),背景天藍漸層、theme-color/favicon 同步 |
+| V0.2.2 | 部署結構修正:後端三檔從 backend/ 移到 repo 根目錄(解 Railway 子目錄 build 失敗,坑 #1);前端維持 docs/ |
 
 ---
 
@@ -143,6 +151,11 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 
 ## 八、升版必讀(如有)
 
+### V0.2.2 結構變更
+
+- 後端三檔(`main.py` / `requirements.txt` / `Procfile`)已從 `backend/` 移到 **repo 根目錄**,讓 Railway 免設 Root Directory 即可 build。Start command 仍是 `uvicorn main:app --host 0.0.0.0 --port $PORT`(根目錄起點,寫 `main:app` 即可)。
+- 前端維持在 `docs/`(GitHub Pages 從 /docs 部署),兩者互不影響。
+
 ### V0.2.0 升版指引(契約變更)
 
 - 後端回傳格式新增 `ok` 旗標:`{ok:true,...}` 或 `{ok:false,redirect}`。**前端必須依 `ok` 分流**,不能假設一定有 `upgraded`。
@@ -153,4 +166,4 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 
 ## 九、一句話總結
 
-V0.2.0:取英文品牌名 WordWand,並加上兒童安全兩道防線(範圍鎖定只做作文 + G 級內容把關,後端 ok 旗標 + fail-safe);架構仍是「GitHub Pages 靜態前端 + Railway 代理藏 key」、不套品牌 logo;下版第一優先是實際部署並把 BACKEND_URL 與 CORS 收斂到自己的網址。
+V0.2.2:把後端三檔移到 repo 根目錄,解掉 Railway 子目錄 build 失敗(坑 #1);前面 V0.2.1 配色已是天藍+粉、V0.2.0 已有兒童安全兩道防線與品牌名 WordWand;架構仍是「GitHub Pages 靜態前端(docs/) + Railway 代理藏 key(根目錄)」、不套品牌 logo;下版第一優先是部署成功後把 BACKEND_URL 填上、CORS 收斂到自己的網址。

@@ -5,14 +5,14 @@
 - **專案名稱:** WordWand（成語魔法屋）
 - **專案類型:** 靜態前端(GitHub Pages)+ FastAPI 後端(Railway)混合 — AI 寫作工具
 - **技術棧:** React 18(CDN + Babel standalone)/ Python 3.10+ FastAPI 0.115 / Claude API(Haiku)
-- **規模:** 10 個檔案,前端約 290 行、後端約 110 行
+- **規模:** 9 個檔案(後端移至 repo 根目錄),前端約 290 行、後端約 110 行
 - **使用 Kit 版本:** V1.11.1
-- **完成版本:** V0.2.0
+- **完成版本:** V0.2.2
 - **完成日期:** 2026-06-05
 
 ### 自我檢查清單
 ```
-✓ 「完成版本」已填、格式 V0.2.0(三位)
+✓ 「完成版本」已填、格式 V0.2.2(三位)
 ✓ 版本號與 CLAUDE.md / README.md / 程式 VERSION 一致
 ✓ 完成日期 2026-06-05(YYYY-MM-DD)
 ```
@@ -33,7 +33,12 @@
    - 跟 `sela-philosophy 一.5`「用戶自己的 key 存 localStorage」是**對立情境**:那條講「使用者各自的 key」,這條講「SELA 自己的 key 服務一群不擁有 key 的使用者(如學生)」,後者絕不能放前端,必須走後端代理 + 伺服器端組 prompt 限制用途。
    - 建議:N≥2(下個 AI 公開服務專案)再考慮在 sela-philosophy 補一條對照。
 
-2. **[N=1 新 stack 訊號] React via CDN + Babel standalone(零建置)**
+2. **[N=1,已實際踩到] Railway 部署 monorepo / 多資料夾 repo,後端在子目錄會 build 失敗**
+   - Railpack 預設從 repo 根目錄分析,子目錄的 `requirements.txt` 看不到 → 報「could not determine how to build」。
+   - 解法:服務 Settings 設 Root Directory,或把後端放 repo 根目錄(本專案 V0.2.2 採後者)。
+   - 通用於任何 Railway monorepo 部署。N=1,建議下個 monorepo→Railway 專案再評估進坑庫。
+
+3. **[N=1 新 stack 訊號] React via CDN + Babel standalone(零建置)**
    - 用於極小型互動工具,免 Vite/CRA build、Git Pusher 推一份即上 Pages。
    - 屬「既有 framework 的新部署方式」(方向 2),沒踩坑,僅標訊號。N≥2 再評估是否值得開 reference。
 
@@ -70,5 +75,6 @@
 | React via CDN 零建置 | 新 stack 訊號(N=1) | 暫緩,標訊號不開 reference |
 | docs/ + backend/ 雙端同 repo 打包結構 | 設計模式候選(N=1) | 暫緩,等第二個 Pages+Railway 混合專案驗證 |
 | 兒童/受限對象 AI「範圍+內容」雙閘 + fail-safe | 設計模式候選(N=1) | 暫緩,等第二個受限對象 AI 專案驗證後再評估進 sela-philosophy 安全節 |
+| Railway 子目錄 build 失敗 → 設 Root Directory 或移根目錄 | 通用坑候選(N=1,已實際踩到) | 暫緩,等第二個 Railway monorepo 專案驗證後進 cross-project-pitfalls |
 
 > 本版所有候選皆 N=1,依 Kit「N=1 暫緩、N≥2 進規範」鐵律,**不主動升 Kit**,僅記錄訊號。

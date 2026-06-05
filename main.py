@@ -2,7 +2,7 @@
 """
 WordWand (成語魔法屋) - 後端代理 (FastAPI)
 功能：藏 Claude API key / 伺服器端組 prompt / 兒童安全把關 / 回傳結構化 JSON
-適用：Python 3.10+ / FastAPI 0.115 / 部署於 Railway（root directory 設為 backend/）
+適用：Python 3.10+ / FastAPI 0.115 / 部署於 Railway（檔案在 repo 根目錄，免設 Root Directory）
 
 安全設計（V0.2.0）：兩道防線都在伺服器端，前端無法繞過——
   1. 範圍鎖定：只幫忙改寫「想變漂亮的句子」，其餘問題（問知識、聊天、要求做別的事）一律不答，溫柔請小朋友給句子。
@@ -10,7 +10,7 @@ WordWand (成語魔法屋) - 後端代理 (FastAPI)
 由模型在 JSON 回傳 "ok" 旗標判定：ok=true 才改寫，ok=false 回 redirect 引導語。
 """
 
-VERSION = "V0.2.0"
+VERSION = "V0.2.2"
 
 import os
 import json
