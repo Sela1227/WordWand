@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.9.0
+- **版本:** V0.10.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** AI 作文練習小幫手,主打國小、可切國中/高中;六~七種寫作模式 + 三精靈 + 分齡安全;英文品牌 WordWand、中文名作文魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -58,6 +58,8 @@
 | 身分門檻頁 | `docs/index.html` 的 `Gate` 元件 + `Root`(view: gate/app) |
 | 中學通行碼 | `docs/index.html` 的 `MID_PASSWORD`(前端簡易鎖,改這裡;非資安防線) |
 | 視覺主題(中學三風格) | `docs/index.html` 的 `THEMES` / `resolvePalette` / `makeStyles(pal)` |
+| 各風格精靈造型 | `Spirit` 分派 → `Mascot`(可愛泡泡)/`NordicPal`(北歐鵝卵石)/`ScifiBot`(科幻機器人) |
+| 各風格精靈名字/標語 | `docs/index.html` 的 `SPIRIT_SKINS`(cute/nordic/scifi × nini/kiki/max);後端 spirit 代碼仍 nini/kiki/max |
 | 模式正式名稱(中學) | MODES 的 `titleFormal`;`modeName()` 依 audience 切換 |
 | 議題類別(議論用) | `docs/index.html` 的 `ISSUE_TOPICS`(jh/sh 各一組,耐久思辨題非新聞) |
 | 學段切換 | `stage` state / `changeStage` / `visibleModes`(議論限 jh/sh) |
@@ -173,6 +175,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 | V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
 | V0.8.0 | 加學段切換(國小/國中/高中,預設國小):紅線全齡通用、題材/用字隨學段放寬、「只做寫作練習」scope 全齡不變;國中/高中多開「議論小教練」;模式依學段過濾顯示 |
+| V0.10.0 | 中學三風格各有專屬造型精靈(可愛泡泡/北歐鵝卵石/科幻機器人)+ 名字隨風格(諾雅艾文芬恩/露娜賽法澤洛);個性與後端 spirit 代碼不變,只換顯示皮膚 |
 | V0.9.0 | 前端大改:入口門檻頁(國小直接進/中學需通行碼→選國中高中)、中學可切可愛/北歐極簡/科幻三主題(THEMES+makeStyles(pal))、中學模式用正式名(titleFormal)、議論加議題類別(ISSUE_TOPICS,耐久思辨題)、← 換身分回門檻。後端僅版號對齊(主題/密碼/議題皆前端) |
 
 ---
@@ -199,6 +202,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 - `MID_PASSWORD` 是前端簡易鎖,**不是資安防線**(原始碼公開)。可接受,因為後端紅線全齡通用;不要把它當真正權限控管。
 - 議題類別 `ISSUE_TOPICS` 是耐久思辨題、**刻意不接即時新聞**(對未成年餵即時時事風險高)。要加題目就改這個常數。
 - 後端無關主題/密碼;只有 stage(es/jh/sh)與 argue 模式跟它配合,改前端風格不需動後端。
+- (V0.10.0)精靈造型走 `Spirit` 分派:可愛=`Mascot`、北歐=`NordicPal`、科幻=`ScifiBot`;名字走 `SPIRIT_SKINS[variant][key]`。個性(溫柔/博學/活力)與後端 `spirit` 代碼(nini/kiki/max)不變,改的只是顯示皮膚。要新增風格:THEMES 加一組色 + SPIRIT_SKINS 加一組名 + Spirit 分派加一種造型。
 
 ### V0.8.0 學段切換(維護重點)
 

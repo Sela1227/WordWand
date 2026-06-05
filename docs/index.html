@@ -33,7 +33,7 @@
 <script type="text/babel">
 const { useState, useRef } = React;
 
-const VERSION = "V0.9.0";
+const VERSION = "V0.10.0";
 
 /* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";
@@ -49,6 +49,25 @@ const SPIRITS = {
     intro:"我知道很多語文的小知識!把句子交給我,我會幫你想得更清楚。" },
   max:  { name:"麥克斯", tag:"活力滿點", color:"#8AA0F2", soft:"#E7ECFF", deep:"#4756B5",
     intro:"我超有活力!我們一起把普通的句子,變成超棒的作品吧!" },
+};
+
+/* 精靈「顯示皮膚」:個性(溫柔/博學/活力)不變,名字與語氣隨風格切換。後端 spirit 代碼仍是 nini/kiki/max。 */
+const SPIRIT_SKINS = {
+  cute: {
+    nini:{ name:"尼尼", tag:"溫柔引導", intro:"我會溫柔地聽你說。寫錯也沒關係,我們一起慢慢找出好玩、漂亮的句子!" },
+    kiki:{ name:"奇奇", tag:"博學小老師", intro:"我知道很多語文的小知識!把句子交給我,我會幫你想得更清楚。" },
+    max: { name:"麥克斯", tag:"活力滿點", intro:"我超有活力!我們一起把普通的句子,變成超棒的作品吧!" },
+  },
+  nordic: {
+    nini:{ name:"諾雅", tag:"沉穩陪伴", intro:"慢慢來。把想法交給我,我陪你一句一句把它理清楚。" },
+    kiki:{ name:"艾文", tag:"條理思考", intro:"我擅長把雜亂的想法整理成清楚的結構,一起把它組織起來吧。" },
+    max: { name:"芬恩", tag:"俐落推進", intro:"先把想到的寫下來,我幫你把它打磨得更精準、更有力。" },
+  },
+  scifi: {
+    nini:{ name:"露娜", tag:"輔助核心", intro:"系統就緒。輸入你的想法,我會協助你逐步生成更好的表達。" },
+    kiki:{ name:"賽法", tag:"分析模組", intro:"啟動分析。我會拆解你的句子結構,標出可以優化的節點。" },
+    max: { name:"澤洛", tag:"加速引擎", intro:"引擎全開。我們快速迭代,把草稿推進到下一個版本。" },
+  },
 };
 
 /* 中學三主題 + 國小固定可愛。cute 的 accent 來自精靈;北歐/科幻用主題色。 */
@@ -153,13 +172,39 @@ function Mascot({ type, color, size=72, animate=true }) {
     </svg>
   );
 }
-function SimpleMark({ color, soft, size=72 }) {
+function NordicPal({ type, color, surface="#FFFFFF", size=72, animate=true }) {
+  const ink = "#2E3A44";
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100">
-      <rect x="14" y="14" width="72" height="72" rx="20" fill={soft} stroke={color} strokeWidth="3" />
-      <path d="M50 28 C54 44 56 46 72 50 C56 54 54 56 50 72 C46 56 44 54 28 50 C44 46 46 44 50 28 Z" fill={color} />
+    <svg width={size} height={size} viewBox="0 0 100 100" style={{ animation: animate ? "bob 3s ease-in-out infinite" : "none" }}>
+      <path d="M50 16 C72 16 84 31 84 52 C84 73 70 86 50 86 C30 86 16 73 16 52 C16 31 28 16 50 16 Z" fill={surface} stroke={color} strokeWidth="3" />
+      <circle cx="40" cy="52" r="3" fill={ink} /><circle cx="60" cy="52" r="3" fill={ink} />
+      {type==="nini" && <path d="M42 62 q8 5 16 0" stroke={ink} strokeWidth="2.6" fill="none" strokeLinecap="round" />}
+      {type==="kiki" && (<><circle cx="40" cy="52" r="7" fill="none" stroke={color} strokeWidth="2" /><circle cx="60" cy="52" r="7" fill="none" stroke={color} strokeWidth="2" /><line x1="47" y1="52" x2="53" y2="52" stroke={color} strokeWidth="2" /></>)}
+      {type==="max" && <path d="M43 60 l7 7 7 -7" stroke={ink} strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+      {type==="nini" && <path d="M50 7 q7 6 0 11 q-7 -5 0 -11 z" fill={color} />}
+      {type==="kiki" && <rect x="43" y="6" width="14" height="9" rx="2" fill={color} />}
+      {type==="max" && <path d="M50 4 l5 9 -10 0 z" fill={color} />}
     </svg>
   );
+}
+function ScifiBot({ type, color, surface="#171E38", size=72, animate=true }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" style={{ animation: animate ? "bob 3s ease-in-out infinite" : "none" }}>
+      <line x1="50" y1="6" x2="50" y2="17" stroke={color} strokeWidth="3" strokeLinecap="round" /><circle cx="50" cy="6" r="3.5" fill={color} />
+      <rect x="20" y="18" width="60" height="58" rx="16" fill={surface} stroke={color} strokeWidth="3" />
+      <rect x="29" y="33" width="42" height="24" rx="12" fill="#0C1022" stroke={color} strokeWidth="2" />
+      <circle cx="42" cy="45" r="3.6" fill={color} /><circle cx="58" cy="45" r="3.6" fill={color} />
+      {type==="nini" && <path d="M36 66 q14 6 28 0" stroke={color} strokeWidth="2.6" fill="none" strokeLinecap="round" />}
+      {type==="kiki" && <path d="M40 66 h20 M50 62 v8" stroke={color} strokeWidth="2.4" strokeLinecap="round" />}
+      {type==="max" && <path d="M37 68 l8 -6 5 5 8 -7" stroke={color} strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+      <circle cx="20" cy="48" r="3" fill={color} /><circle cx="80" cy="48" r="3" fill={color} />
+    </svg>
+  );
+}
+function Spirit({ variant, type, color, pal, size=72, animate=true }) {
+  if (variant === "scifi") return <ScifiBot type={type} color={color} surface={pal.surface} size={size} animate={animate} />;
+  if (variant === "nordic") return <NordicPal type={type} color={color} surface={pal.surface} size={size} animate={animate} />;
+  return <Mascot type={type} color={color} size={size} animate={animate} />;
 }
 function Sparkle({ top, left, size=16, delay=0 }) {
   return (
@@ -231,10 +276,13 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
   const fileInputRef = useRef(null);
 
   const isMid = audience === "mid";
-  const pal = resolvePalette(isMid ? theme : "cute", spiritKey);
+  const variant = isMid ? theme : "cute";
+  const pal = resolvePalette(variant, spiritKey);
   const S = makeStyles(pal);
   const cfg = MODES[mode];
   const spirit = SPIRITS[spiritKey];
+  const skin = SPIRIT_SKINS[variant] || SPIRIT_SKINS.cute;
+  const spiritInfo = skin[spiritKey];
   const modeName = (m) => isMid ? (m.titleFormal || m.title) : m.title;
 
   const visibleModes = Object.values(MODES).filter((m) => !m.stages || m.stages.includes(stage));
@@ -359,20 +407,20 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
         <div style={{...S.heroCard, background:pal.soft}}>
           {pal.cute && (<><Sparkle top={14} left={"18%"} size={14} delay={0} /><Sparkle top={30} left={"82%"} size={18} delay={0.7} /><Sparkle top={86} left={"8%"} size={12} delay={1.3} /></>)}
           <div style={S.heroRow}>
-            {pal.cute ? <Mascot type={spiritKey} color={pal.accent} size={80} /> : <SimpleMark color={pal.accent} soft={pal.surface} size={64} />}
+            <Spirit variant={variant} type={spiritKey} color={pal.accent} pal={pal} size={78} />
             <div style={{flex:1, minWidth:0}}>
               <div style={{...S.pill, background:pal.accent, color:pal.onAccent}}>你的寫作小教練</div>
-              <div style={{...S.heroName, color:pal.deep}}>{spirit.tag}的【{spirit.name}】</div>
+              <div style={{...S.heroName, color:pal.deep}}>{spiritInfo.tag}的【{spiritInfo.name}】</div>
             </div>
           </div>
-          <div style={{...S.heroQuote, color:pal.deep}}>「{spirit.intro}」</div>
+          <div style={{...S.heroQuote, color:pal.deep}}>「{spiritInfo.intro}」</div>
         </div>
 
         <div style={S.switchRow}>
           <span style={S.switcherLabel}>切換教練</span>
           {Object.entries(SPIRITS).map(([k,s])=>{ const on=k===spiritKey; return (
             <button key={k} onClick={()=>setSpiritKey(k)} style={{...S.spiritChip, borderColor:on?pal.accent:pal.border, background:on?pal.soft:pal.surface, color:on?pal.deep:pal.muted}}>
-              {pal.cute ? <Mascot type={k} color={s.color} size={26} animate={false} /> : <span style={{width:10,height:10,borderRadius:999,background:pal.accent,display:"inline-block"}} />}{s.name}
+              <Spirit variant={variant} type={k} color={pal.cute ? s.color : pal.accent} pal={pal} size={26} animate={false} />{skin[k].name}
             </button>
           );})}
         </div>
@@ -419,7 +467,7 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
 
         {loading && (
           <div style={S.loadingBox}>
-            {pal.cute ? <Mascot type={spiritKey} color={pal.accent} size={56} /> : <SimpleMark color={pal.accent} soft={pal.surface} size={48} />}
+            <Spirit variant={variant} type={spiritKey} color={pal.accent} pal={pal} size={56} />
             <div style={S.dots}><span style={{...S.dot, background:pal.accent}} /><span style={{...S.dot, background:pal.accent, animationDelay:"0.2s"}} /><span style={{...S.dot, background:pal.accent, animationDelay:"0.4s"}} /></div>
           </div>
         )}
@@ -429,7 +477,7 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
         {result && !loading && result.ok === false && (
           <div style={S.resultWrap}>
             <div style={{...S.cheerCard, background:pal.soft, color:pal.deep}}>
-              {pal.cute ? <Mascot type={spiritKey} color={pal.accent} size={44} animate={false} /> : <SimpleMark color={pal.accent} soft={pal.surface} size={40} />}
+              <Spirit variant={variant} type={spiritKey} color={pal.accent} pal={pal} size={44} animate={false} />
               <span>{result.redirect || "我們在作文魔法屋只幫你做寫作練習喔!請給我一個適合的題目或句子吧!"}</span>
             </div>
           </div>
@@ -461,7 +509,7 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
             ))}
             {result.cheer && (
               <div style={{...S.cheerCard, background:pal.soft, color:pal.deep}}>
-                {pal.cute ? <Mascot type={spiritKey} color={pal.accent} size={44} animate={false} /> : <SimpleMark color={pal.accent} soft={pal.surface} size={40} />}
+                <Spirit variant={variant} type={spiritKey} color={pal.accent} pal={pal} size={44} animate={false} />
                 <span>{result.cheer}</span>
               </div>
             )}
