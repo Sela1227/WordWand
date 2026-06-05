@@ -4,7 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>WordWand 作文魔法屋</title>
-<!-- 自訂 favicon（本專案不套 SELA logo，使用專屬可愛標記）。相對路徑：GitHub Pages 子路徑安全（坑 #39） -->
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="manifest" href="site.webmanifest" />
 <meta name="theme-color" content="#54B9EC" />
@@ -18,10 +17,9 @@
   html { -webkit-text-size-adjust: 100%; }
   html, body { margin: 0; padding: 0; overflow-x: hidden; }
   #root { min-height: 100vh; }
-  /* 手機:消除點擊 300ms 延遲與灰色高亮、防止文字被選取 */
   button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
   button:active { filter: brightness(0.95); }
-  textarea { -webkit-tap-highlight-color: transparent; }
+  textarea, input { -webkit-tap-highlight-color: transparent; }
   @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
   @keyframes twinkle { 0%,100%{opacity:0.2;transform:scale(0.7)} 50%{opacity:1;transform:scale(1.1)} }
   @keyframes dotjump { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-10px)} }
@@ -35,65 +33,101 @@
 <script type="text/babel">
 const { useState, useRef } = React;
 
-const VERSION = "V0.7.0";
+const VERSION = "V0.9.0";
 
-/* ====================================================================== */
-/*  ★★★ 唯一需要你修改的地方:把下面換成你的 Railway 後端網址 ★★★         */
-/*  例如:"https://chengyu-magic.up.railway.app"                          */
-/*  (後端檔案在 repo 根目錄,Railway 免設 Root Directory)                 */
-/* ====================================================================== */
+/* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";
+/* ★ 中學通行碼(前端簡易鎖,非資安防線;真正保護在後端紅線)。改這裡即可。 */
+const MID_PASSWORD = "1234";
 
-/* 精靈「外觀」設定（人格 prompt 放在後端,前端只負責顯示） */
+const baseFont = "'Noto Sans TC', system-ui, -apple-system, 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans CJK TC', 'Segoe UI', sans-serif";
+
 const SPIRITS = {
   nini: { name:"尼尼", tag:"溫柔引導", color:"#FF8FB3", soft:"#FFE4EE", deep:"#C84B77",
-    intro:"尼尼會溫柔地聽你說話。寫錯也沒有關係,我們一起慢慢找出好玩、漂亮的句子!" },
+    intro:"我會溫柔地聽你說。寫錯也沒關係,我們一起慢慢找出好玩、漂亮的句子!" },
   kiki: { name:"奇奇", tag:"博學小老師", color:"#54B9EC", soft:"#DCF1FC", deep:"#1E7BB0",
-    intro:"奇奇知道很多成語的小故事!把句子交給我,我會告訴你每個成語從哪裡來。" },
+    intro:"我知道很多語文的小知識!把句子交給我,我會幫你想得更清楚。" },
   max:  { name:"麥克斯", tag:"活力滿點", color:"#8AA0F2", soft:"#E7ECFF", deep:"#4756B5",
-    intro:"麥克斯超有活力!我們一起把無聊的句子,變成超酷的成語魔法吧!" },
+    intro:"我超有活力!我們一起把普通的句子,變成超棒的作品吧!" },
 };
+
+/* 中學三主題 + 國小固定可愛。cute 的 accent 來自精靈;北歐/科幻用主題色。 */
+const THEMES = {
+  cute:   { bg:"radial-gradient(120% 120% at 50% 0%, #E6F5FF 0%, #F1FAFF 38%, #FFEFF6 100%)",
+            surface:"#FFFFFF", text:"#3A2E3F", muted:"#9A8FA0", border:"#F0E4EE",
+            tabsBg:"rgba(255,255,255,0.5)", onAccent:"#FFFFFF", shadow:"0 10px 28px rgba(180,120,160,0.16)",
+            accent:"#54B9EC", soft:"#DCF1FC", deep:"#1E7BB0", cute:true },
+  nordic: { bg:"linear-gradient(180deg,#F4F7F9 0%,#E9EFF2 100%)",
+            surface:"#FFFFFF", text:"#2E3A44", muted:"#8A98A4", border:"#E2E8EC",
+            tabsBg:"#FFFFFF", onAccent:"#FFFFFF", shadow:"0 8px 22px rgba(90,120,140,0.12)",
+            accent:"#5C8AA6", soft:"#E7EEF2", deep:"#39647F", cute:false },
+  scifi:  { bg:"radial-gradient(120% 120% at 50% 0%, #16203E 0%, #0C1022 72%)",
+            surface:"#171E38", text:"#E7ECFF", muted:"#8E97C0", border:"#2C3760",
+            tabsBg:"rgba(255,255,255,0.06)", onAccent:"#08121F", shadow:"0 10px 28px rgba(0,0,0,0.45)",
+            accent:"#37E0D2", soft:"#1E2746", deep:"#8BF6EE", cute:false },
+};
+const MID_THEME_LIST = [
+  { key:"cute", label:"可愛" }, { key:"nordic", label:"北歐極簡" }, { key:"scifi", label:"科幻" },
+];
+
 const MODES = {
-  ideas: { key:"ideas", title:"靈感泡泡", btn:"給我點子!", inputLabel:"輸入一個主題詞:",
-    blurb:"不知道要寫什麼嗎?給小精靈一個主題,它會吹出好多靈感泡泡,從不同角度幫你打開思路!",
-    placeholder:"我的學校",
-    itemLabels:{meaning:"想想看"},
-    resultHint:"這些靈感泡泡,挑你喜歡的寫進去:",
+  ideas: { key:"ideas", title:"靈感泡泡", titleFormal:"靈感發想", btn:"給我點子!", inputLabel:"輸入一個主題詞:",
+    blurb:"不知道要寫什麼嗎?給一個主題,小精靈會從不同角度幫你打開思路!",
+    placeholder:"我的學校", itemLabels:{meaning:"想想看"},
+    resultHint:"這些點子,挑你喜歡的寫進去:",
     examples:["下雨天","我的好朋友","我最喜歡的食物"] },
-  outline:{ key:"outline", title:"作文藏寶圖", btn:"畫藏寶圖!", inputLabel:"輸入你的作文題目:",
-    blurb:"拿到題目不知道怎麼開始嗎?把題目給小精靈,它會幫你畫一張藏寶圖,告訴你開頭、經過、結尾各寫什麼!",
-    placeholder:"快樂的一天",
-    itemLabels:{meaning:"可以寫什麼"},
-    resultHint:"照著這張藏寶圖,一段一段自己寫:",
+  outline:{ key:"outline", title:"作文藏寶圖", titleFormal:"大綱規劃", btn:"畫大綱!", inputLabel:"輸入你的作文題目:",
+    blurb:"拿到題目不知道怎麼開始嗎?把題目給小精靈,它會幫你規劃開頭、經過、結尾各寫什麼!",
+    placeholder:"快樂的一天", itemLabels:{meaning:"可以寫什麼"},
+    resultHint:"照著這份大綱,一段一段自己寫:",
     examples:["我最難忘的一天","我的家人","一次失敗的經驗"] },
-  gym:   { key:"gym", title:"句子健身房", btn:"幫我看看!", inputLabel:"輸入你想練習的句子:",
-    blurb:"把你寫的句子放進來,小精靈像教練一樣,告訴你哪裡可以練得更強壯、還有怎麼改,讓你自己越寫越棒!",
-    placeholder:"天氣很好,我們出去玩。",
-    itemLabels:{meaning:"說明",why:"怎麼改"},
-    resultHint:"教練幫你看看可以更強的地方:",
+  gym:   { key:"gym", title:"句子健身房", titleFormal:"句子優化", btn:"幫我看看!", inputLabel:"輸入你想練習的句子:",
+    blurb:"把你寫的句子放進來,小精靈會告訴你哪裡可以更好、還有怎麼改,讓你自己越寫越棒!",
+    placeholder:"天氣很好,我們出去玩。", itemLabels:{meaning:"說明",why:"怎麼改"},
+    resultHint:"幫你看看可以更好的地方:",
     examples:["我今天去公園玩,很開心。","那隻狗很大很大。","我吃了飯然後去睡覺。"] },
-  grow:  { key:"grow", title:"魔法長大樹", btn:"讓它長大!", inputLabel:"輸入一句話,讓它長大:",
-    blurb:"只寫了一句話,不知道怎麼變多嗎?把句子放進來,小精靈會問你幾個問題,跟著想一想,一句話就會長成一段!",
+  grow:  { key:"grow", title:"魔法長大樹", titleFormal:"段落擴寫", btn:"讓它長大!", inputLabel:"輸入一句話,讓它變長:",
+    blurb:"只寫了一句話,不知道怎麼變多嗎?小精靈會問你幾個問題,跟著想一想,一句話就會變成一段!",
     placeholder:"我吃了一個冰淇淋。",
     resultHint:"跟著這幾個問題想一想,再自己寫寫看:",
     examples:["今天我去了動物園。","昨天下雨了。","我有一個好朋友。"] },
-  idiom: { key:"idiom", title:"成語變身術", btn:"變身!", inputLabel:"輸入你想練習的句子:",
-    blurb:"你常常寫「很生氣」、「哭得很慘」、「天氣很漂亮」嗎?把句子放進來,小精靈會幫你找出好用的成語!",
-    placeholder:"他跑得很快很快。",
-    itemLabels:{meaning:"意思",why:"為什麼適合"},
+  idiom: { key:"idiom", title:"成語變身術", titleFormal:"成語潤飾", btn:"變身!", inputLabel:"輸入你想練習的句子:",
+    blurb:"常常寫「很生氣」、「很漂亮」嗎?把句子放進來,小精靈會幫你找出好用的成語!",
+    placeholder:"他跑得很快很快。", itemLabels:{meaning:"意思",why:"為什麼適合"},
     examples:["我今天考了一百分,心裡非常高興。","弟弟把房間弄得很亂。","今天的夕陽真的好漂亮。"] },
-  senses:{ key:"senses", title:"五感放大鏡", btn:"變身!", inputLabel:"輸入你想練習的句子:",
-    blurb:"好的描寫會用到眼睛、耳朵、鼻子、嘴巴和皮膚。把句子放進來,小精靈會幫你加上生動的感官描寫!",
-    placeholder:"我打開了窗戶。",
-    itemLabels:{meaning:"描寫",why:"好處"},
+  senses:{ key:"senses", title:"五感放大鏡", titleFormal:"感官描寫", btn:"變身!", inputLabel:"輸入你想練習的句子:",
+    blurb:"好的描寫會用到眼睛、耳朵、鼻子、嘴巴和皮膚。小精靈會幫你加上生動的感官描寫!",
+    placeholder:"我打開了窗戶。", itemLabels:{meaning:"描寫",why:"好處"},
     examples:["我走進了廚房。","外面開始下雨了。","媽媽煮了一鍋湯。"] },
+  argue: { key:"argue", title:"議論小教練", titleFormal:"議論練習", btn:"想論點!", inputLabel:"輸入議題或你的看法:",
+    blurb:"寫議論文時,給小教練一個議題,它會陪你想幾個論點和舉例方向,記得也想想反方,論述更周全!",
+    placeholder:"AI 對中學生的影響", itemLabels:{meaning:"怎麼舉例"},
+    resultHint:"這些論點挑你認同的,記得也想想反方說法:",
+    stages:["jh","sh"],
+    examples:["手機該不該帶到學校","網路購物的好與壞","該不該保留紙本書"] },
 };
 
+/* 議題類別:耐久、適合思辨的方向(非即時新聞)。愈高年級愈抽象。 */
+const ISSUE_TOPICS = {
+  jh: ["社群媒體的影響","環保與生活","校園手機規範","網路霸凌","AI 與學習","運動與健康","網路購物的利弊"],
+  sh: ["科技與隱私","永續發展","世代價值差異","媒體識讀","人與 AI 的關係","自由與規範","成功的定義"],
+};
+const MID_STAGES = [ { key:"jh", label:"國中" }, { key:"sh", label:"高中" } ];
+
+function resolvePalette(theme, spiritKey) {
+  const t = THEMES[theme] || THEMES.cute;
+  if (t.cute) {
+    const sp = SPIRITS[spiritKey];
+    return { ...t, accent:sp.color, soft:sp.soft, deep:sp.deep };
+  }
+  return t;
+}
+
+/* ---------- 圖示 ---------- */
 function Mascot({ type, color, size=72, animate=true }) {
   const eye = "#3A2E3F";
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100"
-      style={{ animation: animate ? "bob 2.6s ease-in-out infinite" : "none" }}>
+    <svg width={size} height={size} viewBox="0 0 100 100" style={{ animation: animate ? "bob 2.6s ease-in-out infinite" : "none" }}>
       <ellipse cx="38" cy="92" rx="9" ry="6" fill={color} opacity="0.85" />
       <ellipse cx="62" cy="92" rx="9" ry="6" fill={color} opacity="0.85" />
       <path d="M50 12 C74 12 86 30 86 52 C86 76 70 90 50 90 C30 90 14 76 14 52 C14 30 26 12 50 12 Z" fill={color} />
@@ -104,73 +138,84 @@ function Mascot({ type, color, size=72, animate=true }) {
         <path d="M34 46 q5 6 10 0" stroke={eye} strokeWidth="3.5" fill="none" strokeLinecap="round" />
         <path d="M56 46 q5 6 10 0" stroke={eye} strokeWidth="3.5" fill="none" strokeLinecap="round" />
         <path d="M44 56 q6 5 12 0" stroke={eye} strokeWidth="3" fill="none" strokeLinecap="round" />
-        <path d="M40 16 l8 6 -8 6 z" fill="#FFFFFF" opacity="0.9" />
-        <path d="M60 16 l-8 6 8 6 z" fill="#FFFFFF" opacity="0.9" />
-        <circle cx="50" cy="22" r="3" fill="#FFFFFF" />
+        <path d="M40 16 l8 6 -8 6 z" fill="#FFFFFF" opacity="0.9" /><path d="M60 16 l-8 6 8 6 z" fill="#FFFFFF" opacity="0.9" /><circle cx="50" cy="22" r="3" fill="#FFFFFF" />
       </>)}
       {type==="kiki" && (<>
-        <circle cx="38" cy="48" r="3.5" fill={eye} />
-        <circle cx="62" cy="48" r="3.5" fill={eye} />
-        <circle cx="38" cy="48" r="10" fill="none" stroke={eye} strokeWidth="2.5" />
-        <circle cx="62" cy="48" r="10" fill="none" stroke={eye} strokeWidth="2.5" />
-        <line x1="48" y1="48" x2="52" y2="48" stroke={eye} strokeWidth="2.5" />
-        <path d="M44 58 q6 4 12 0" stroke={eye} strokeWidth="3" fill="none" strokeLinecap="round" />
+        <circle cx="38" cy="48" r="3.5" fill={eye} /><circle cx="62" cy="48" r="3.5" fill={eye} />
+        <circle cx="38" cy="48" r="10" fill="none" stroke={eye} strokeWidth="2.5" /><circle cx="62" cy="48" r="10" fill="none" stroke={eye} strokeWidth="2.5" />
+        <line x1="48" y1="48" x2="52" y2="48" stroke={eye} strokeWidth="2.5" /><path d="M44 58 q6 4 12 0" stroke={eye} strokeWidth="3" fill="none" strokeLinecap="round" />
       </>)}
       {type==="max" && (<>
-        <circle cx="38" cy="48" r="6" fill={eye} />
-        <circle cx="62" cy="48" r="6" fill={eye} />
-        <circle cx="40" cy="46" r="2" fill="#FFFFFF" />
-        <circle cx="64" cy="46" r="2" fill="#FFFFFF" />
-        <path d="M42 58 q8 8 16 0" stroke={eye} strokeWidth="3.5" fill="none" strokeLinecap="round" />
-        <path d="M50 6 l-7 14 h6 l-4 12 12 -16 h-6 l5 -10 z" fill="#FFFFFF" />
+        <circle cx="38" cy="48" r="6" fill={eye} /><circle cx="62" cy="48" r="6" fill={eye} />
+        <circle cx="40" cy="46" r="2" fill="#FFFFFF" /><circle cx="64" cy="46" r="2" fill="#FFFFFF" />
+        <path d="M42 58 q8 8 16 0" stroke={eye} strokeWidth="3.5" fill="none" strokeLinecap="round" /><path d="M50 6 l-7 14 h6 l-4 12 12 -16 h-6 l5 -10 z" fill="#FFFFFF" />
       </>)}
+    </svg>
+  );
+}
+function SimpleMark({ color, soft, size=72 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100">
+      <rect x="14" y="14" width="72" height="72" rx="20" fill={soft} stroke={color} strokeWidth="3" />
+      <path d="M50 28 C54 44 56 46 72 50 C56 54 54 56 50 72 C46 56 44 54 28 50 C44 46 46 44 50 28 Z" fill={color} />
     </svg>
   );
 }
 function Sparkle({ top, left, size=16, delay=0 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24"
-      style={{ position:"absolute", top, left, animation:`twinkle 2.4s ease-in-out ${delay}s infinite`, pointerEvents:"none" }}>
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ position:"absolute", top, left, animation:`twinkle 2.4s ease-in-out ${delay}s infinite`, pointerEvents:"none" }}>
       <path d="M12 0 C13 7 17 11 24 12 C17 13 13 17 12 24 C11 17 7 13 0 12 C7 11 11 7 12 0 Z" fill="#FFFFFF" opacity="0.9" />
     </svg>
   );
 }
-function MicIcon({ color }) {
+function MicIcon({ color }) { return (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 11 a7 7 0 0 0 14 0" /><line x1="12" y1="18" x2="12" y2="22" /></svg>); }
+function CamIcon({ color }) { return (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7 h3 l1.5 -2 h7 L23 7" /><rect x="3" y="7" width="18" height="13" rx="3" /><circle cx="12" cy="13.5" r="3.5" /></svg>); }
+function CopyIcon({ color }) { return (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5" /><path d="M5 15 H4.5 A1.5 1.5 0 0 1 3 13.5 V4.5 A1.5 1.5 0 0 1 4.5 3 h9 A1.5 1.5 0 0 1 15 4.5 V5" /></svg>); }
+function SpeakIcon({ color }) { return (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 9 v6 h4 l5 4 V5 l-5 4 z" /><path d="M17 8 a5 5 0 0 1 0 8" /></svg>); }
+
+/* ---------- 入口門檻頁 ---------- */
+function Gate({ onEnter }) {
+  const [step, setStep] = useState("choose");
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="9" y="2" width="6" height="11" rx="3" />
-      <path d="M5 11 a7 7 0 0 0 14 0" />
-      <line x1="12" y1="18" x2="12" y2="22" />
-    </svg>
-  );
-}
-function CamIcon({ color }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 7 h3 l1.5 -2 h7 L23 7" />
-      <rect x="3" y="7" width="18" height="13" rx="3" />
-      <circle cx="12" cy="13.5" r="3.5" />
-    </svg>
-  );
-}
-function CopyIcon({ color }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="9" y="9" width="11" height="11" rx="2.5" />
-      <path d="M5 15 H4.5 A1.5 1.5 0 0 1 3 13.5 V4.5 A1.5 1.5 0 0 1 4.5 3 h9 A1.5 1.5 0 0 1 15 4.5 V5" />
-    </svg>
-  );
-}
-function SpeakIcon({ color }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 9 v6 h4 l5 4 V5 l-5 4 z" />
-      <path d="M17 8 a5 5 0 0 1 0 8" />
-    </svg>
+    <div style={G.root}>
+      <div style={G.inner}>
+        <div style={G.brand}>WordWand</div>
+        <div style={G.title}>作文魔法屋</div>
+        <div style={G.sub}>請先選擇身分</div>
+        {step==="choose" && (<>
+          <button style={G.cardES} onClick={()=>onEnter("es","es","cute")}>
+            <span style={G.cardBig}>國小</span>
+            <span style={G.cardSmall}>可愛精靈陪你練作文</span>
+          </button>
+          <button style={G.cardMID} onClick={()=>{setStep("pw");setErr("");}}>
+            <span style={G.cardBig}>中學</span>
+            <span style={G.cardSmall}>國中・高中,可自由換風格</span>
+          </button>
+        </>)}
+        {step==="pw" && (<>
+          <div style={G.label}>請輸入中學通行碼</div>
+          <input type="password" value={pw} inputMode="numeric"
+            onChange={(e)=>setPw(e.target.value)} style={G.input} placeholder="• • • •" />
+          {err && <div style={G.err}>{err}</div>}
+          <button style={G.primary} onClick={()=>{ if(pw===MID_PASSWORD){setStep("stage");setErr("");} else {setErr("通行碼不對喔!再試一次。");} }}>確認</button>
+          <button style={G.ghost} onClick={()=>{setStep("choose");setPw("");setErr("");}}>返回</button>
+        </>)}
+        {step==="stage" && (<>
+          <div style={G.label}>選擇年級</div>
+          <button style={G.primary} onClick={()=>onEnter("mid","jh","nordic")}>國中</button>
+          <button style={G.primary} onClick={()=>onEnter("mid","sh","nordic")}>高中</button>
+          <button style={G.ghost} onClick={()=>{setStep("choose");setPw("");}}>返回</button>
+        </>)}
+        <div style={G.foot}>WordWand · 作文魔法屋 · {VERSION}</div>
+      </div>
+    </div>
   );
 }
 
-function App() {
+/* ---------- 主工具 ---------- */
+function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
   const [spiritKey, setSpiritKey] = useState("nini");
   const [mode, setMode] = useState("ideas");
   const [text, setText] = useState("");
@@ -184,62 +229,27 @@ function App() {
   const [speaking, setSpeaking] = useState(false);
   const recognitionRef = useRef(null);
   const fileInputRef = useRef(null);
-  const spirit = SPIRITS[spiritKey];
+
+  const isMid = audience === "mid";
+  const pal = resolvePalette(isMid ? theme : "cute", spiritKey);
+  const S = makeStyles(pal);
   const cfg = MODES[mode];
+  const spirit = SPIRITS[spiritKey];
+  const modeName = (m) => isMid ? (m.titleFormal || m.title) : m.title;
 
-  function stopSpeak() { if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel(); setSpeaking(false); }
-
-  function buildExportText(r) {
-    const lines = [];
-    if (r.upgraded) lines.push(r.upgraded);
-    if (Array.isArray(r.items)) r.items.forEach((it) => {
-      let line = "・" + it.word + "：" + it.meaning;
-      if (it.why) line += "（" + ((cfg.itemLabels && cfg.itemLabels.why) || "提示") + "：" + it.why + "）";
-      lines.push(line);
-    });
-    if (Array.isArray(r.questions)) r.questions.forEach((q, i) => lines.push((i + 1) + ". " + q));
-    return lines.join("\n");
-  }
-
-  function buildSpeechText(r) {
-    const parts = [];
-    if (r.upgraded) parts.push(r.upgraded);
-    if (Array.isArray(r.items)) r.items.forEach((it) => parts.push(it.word + "。" + it.meaning + (it.why ? "。" + it.why : "")));
-    if (Array.isArray(r.questions)) r.questions.forEach((q) => parts.push(q));
-    return parts.join("。");
-  }
-
-  async function copyResult() {
-    if (!result) return;
-    const txt = buildExportText(result);
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(txt);
-      } else {
-        const ta = document.createElement("textarea");
-        ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
-        document.body.appendChild(ta); ta.select(); document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
-      setCopyMsg("已複製!貼到哪裡都可以給老師看");
-    } catch(_) { setCopyMsg("複製失敗,手動選取一下也可以喔!"); }
-    setTimeout(() => setCopyMsg(""), 2500);
-  }
-
-  function toggleSpeak() {
-    if (typeof window === "undefined" || !window.speechSynthesis || !result) return;
-    if (speaking) { stopSpeak(); return; }
-    const u = new SpeechSynthesisUtterance(buildSpeechText(result));
-    u.lang = "zh-TW"; u.rate = 0.95;
-    u.onend = () => setSpeaking(false);
-    u.onerror = () => setSpeaking(false);
-    window.speechSynthesis.cancel();
-    setSpeaking(true);
-    window.speechSynthesis.speak(u);
-  }
+  const visibleModes = Object.values(MODES).filter((m) => !m.stages || m.stages.includes(stage));
 
   const SR = (typeof window !== "undefined") && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const voiceSupported = !!SR;
+
+  function stopSpeak() { if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel(); setSpeaking(false); }
+  function resetOutputs() { setResult(null); setError(""); stopSpeak(); setCopyMsg(""); setInputMsg(""); }
+
+  function changeStage(st) {
+    setStage(st); resetOutputs();
+    const ok = MODES[mode] && (!MODES[mode].stages || MODES[mode].stages.includes(st));
+    if (!ok) setMode(Object.values(MODES).filter((m)=>!m.stages||m.stages.includes(st))[0].key);
+  }
 
   function toggleVoice() {
     if (!voiceSupported) return;
@@ -248,167 +258,169 @@ function App() {
     rec.lang = "zh-TW"; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
     const startText = text || "";
     rec.onstart = () => { setListening(true); setInputMsg("聆聽中…說說看你的句子"); };
-    rec.onresult = (e) => {
-      let s = "";
-      for (let i = 0; i < e.results.length; i++) s += e.results[i][0].transcript;
-      setText(startText + s);
-    };
-    rec.onerror = (e) => {
-      setListening(false);
-      setInputMsg(e.error === "not-allowed" || e.error === "service-not-allowed"
-        ? "要先允許使用麥克風喔!" : "沒聽清楚,再說一次或直接打字吧!");
-    };
-    rec.onend = () => { setListening(false); setInputMsg((m)=> m === "聆聽中…說說看你的句子" ? "" : m); };
+    rec.onresult = (e) => { let s=""; for (let i=0;i<e.results.length;i++) s+=e.results[i][0].transcript; setText(startText + s); };
+    rec.onerror = (e) => { setListening(false); setInputMsg(e.error==="not-allowed"||e.error==="service-not-allowed" ? "要先允許使用麥克風喔!" : "沒聽清楚,再說一次或直接打字吧!"); };
+    rec.onend = () => { setListening(false); setInputMsg((m)=> m==="聆聽中…說說看你的句子" ? "" : m); };
     recognitionRef.current = rec;
     try { rec.start(); } catch(_) { setListening(false); }
   }
-
   function pickPhoto() { fileInputRef.current && fileInputRef.current.click(); }
-
-  function fileToBase64(file) {
-    return new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(String(r.result).split(",")[1]);
-      r.onerror = () => rej(new Error("read"));
-      r.readAsDataURL(file);
-    });
-  }
-
+  function fileToBase64(file) { return new Promise((res, rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=()=>rej(new Error("read")); r.readAsDataURL(file); }); }
   async function onPhoto(e) {
-    const file = e.target.files && e.target.files[0];
-    e.target.value = "";
+    const file = e.target.files && e.target.files[0]; e.target.value="";
     if (!file) return;
-    if (file.size > 6 * 1024 * 1024) { setInputMsg("照片太大了,換一張小一點的吧!"); return; }
+    if (file.size > 6*1024*1024) { setInputMsg("照片太大了,換一張小一點的吧!"); return; }
     if (BACKEND_URL.includes("YOUR-APP")) { setError("還沒設定後端網址喔!"); return; }
     setPhotoLoading(true); setInputMsg("讀照片中…");
     try {
       const b64 = await fileToBase64(file);
-      const res = await fetch(`${BACKEND_URL}/read-image`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_base64: b64, media_type: file.type || "image/jpeg" }),
-      });
+      const res = await fetch(`${BACKEND_URL}/read-image`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ image_base64:b64, media_type:file.type||"image/jpeg" }) });
       if (!res.ok) throw new Error("bad");
       const data = await res.json();
-      if (data.text && data.text.trim()) {
-        setText(data.text.trim());
-        setInputMsg("讀好了!看看對不對,可以改一改再送出。");
-      } else {
-        setInputMsg("看不太清楚,拍清楚一點再試,或直接打字吧!");
-      }
-    } catch(_) {
-      setInputMsg("照片讀取失敗,再試一次或直接打字吧!");
-    } finally { setPhotoLoading(false); }
+      if (data.text && data.text.trim()) { setText(data.text.trim()); setInputMsg("讀好了!看看對不對,可以改一改再送出。"); }
+      else { setInputMsg("看不太清楚,拍清楚一點再試,或直接打字吧!"); }
+    } catch(_) { setInputMsg("照片讀取失敗,再試一次或直接打字吧!"); }
+    finally { setPhotoLoading(false); }
   }
 
   async function castMagic() {
     const input = text.trim();
     if (!input || loading) return;
-    if (BACKEND_URL.includes("YOUR-APP")) {
-      setError("還沒設定後端網址喔!請打開 docs/index.html,把 BACKEND_URL 換成你的 Railway 網址。");
-      return;
-    }
+    if (BACKEND_URL.includes("YOUR-APP")) { setError("還沒設定後端網址喔!"); return; }
     setLoading(true); setResult(null); setError(""); stopSpeak(); setCopyMsg("");
     try {
-      const res = await fetch(`${BACKEND_URL}/magic`, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ spirit: spiritKey, mode, text: input }),
-      });
+      const res = await fetch(`${BACKEND_URL}/magic`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ spirit:spiritKey, mode, stage, text:input }) });
       if (!res.ok) throw new Error("bad");
-      const data = await res.json();
-      setResult(data);
-    } catch (e) {
-      setError("小精靈的魔法棒打了一個盹,再按一次「變身」試試看吧!");
-    } finally { setLoading(false); }
+      setResult(await res.json());
+    } catch(_) { setError("小精靈的魔法棒打了一個盹,再按一次試試看吧!"); }
+    finally { setLoading(false); }
+  }
+
+  function buildExportText(r) {
+    const lines = [];
+    if (r.upgraded) lines.push(r.upgraded);
+    if (Array.isArray(r.items)) r.items.forEach((it)=>{ let l="・"+it.word+"："+it.meaning; if(it.why) l+="（"+((cfg.itemLabels&&cfg.itemLabels.why)||"提示")+"："+it.why+"）"; lines.push(l); });
+    if (Array.isArray(r.questions)) r.questions.forEach((q,i)=>lines.push((i+1)+". "+q));
+    return lines.join("\n");
+  }
+  function buildSpeechText(r) {
+    const p=[]; if(r.upgraded)p.push(r.upgraded);
+    if(Array.isArray(r.items))r.items.forEach((it)=>p.push(it.word+"。"+it.meaning+(it.why?"。"+it.why:"")));
+    if(Array.isArray(r.questions))r.questions.forEach((q)=>p.push(q));
+    return p.join("。");
+  }
+  async function copyResult() {
+    if(!result) return; const txt=buildExportText(result);
+    try {
+      if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(txt); }
+      else { const ta=document.createElement("textarea"); ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); }
+      setCopyMsg("已複製!貼到哪裡都可以給老師看");
+    } catch(_) { setCopyMsg("複製失敗,手動選取一下也可以喔!"); }
+    setTimeout(()=>setCopyMsg(""), 2500);
+  }
+  function toggleSpeak() {
+    if(typeof window==="undefined"||!window.speechSynthesis||!result) return;
+    if(speaking){ stopSpeak(); return; }
+    const u=new SpeechSynthesisUtterance(buildSpeechText(result)); u.lang="zh-TW"; u.rate=0.95;
+    u.onend=()=>setSpeaking(false); u.onerror=()=>setSpeaking(false);
+    window.speechSynthesis.cancel(); setSpeaking(true); window.speechSynthesis.speak(u);
   }
 
   return (
     <div style={S.root}>
-      <div style={{...S.shell}}>
-        <div style={S.tabs}>
-          {Object.values(MODES).map((m) => {
-            const on = m.key === mode;
-            return <button key={m.key} onClick={()=>{setMode(m.key);setResult(null);setError("");stopSpeak();setCopyMsg("");}}
-              style={{...S.tab, background:on?"#fff":"transparent", color:on?spirit.deep:"#9A8FA0",
-                boxShadow:on?"0 6px 16px rgba(0,0,0,0.08)":"none"}}>{m.title}</button>;
-          })}
+      <div style={S.shell}>
+        <div style={S.topBar}>
+          <button style={S.exitBtn} onClick={()=>{stopSpeak();onExit();}}>← 換身分</button>
+          {isMid && (
+            <div style={S.switcher}>
+              <span style={S.switcherLabel}>年級</span>
+              {MID_STAGES.map((st)=>{ const on=st.key===stage; return (
+                <button key={st.key} onClick={()=>changeStage(st.key)} style={{...S.miniBtn, borderColor:on?pal.accent:pal.border, background:on?pal.accent:pal.surface, color:on?pal.onAccent:pal.muted}}>{st.label}</button>
+              );})}
+            </div>
+          )}
         </div>
 
-        <div style={{...S.heroCard, background:spirit.soft}}>
-          <Sparkle top={14} left={"18%"} size={14} delay={0} />
-          <Sparkle top={30} left={"82%"} size={18} delay={0.7} />
-          <Sparkle top={86} left={"8%"} size={12} delay={1.3} />
+        {isMid && (
+          <div style={S.switcher}>
+            <span style={S.switcherLabel}>風格</span>
+            {MID_THEME_LIST.map((t)=>{ const on=t.key===theme; return (
+              <button key={t.key} onClick={()=>{setTheme(t.key);}} style={{...S.miniBtn, borderColor:on?pal.accent:pal.border, background:on?pal.accent:pal.surface, color:on?pal.onAccent:pal.muted}}>{t.label}</button>
+            );})}
+          </div>
+        )}
+
+        <div style={S.tabs}>
+          {visibleModes.map((m)=>{ const on=m.key===mode; return (
+            <button key={m.key} onClick={()=>{setMode(m.key);resetOutputs();}} style={{...S.tab, background:on?pal.surface:"transparent", color:on?pal.deep:pal.muted, boxShadow:on?pal.shadow:"none"}}>{modeName(m)}</button>
+          );})}
+        </div>
+
+        <div style={{...S.heroCard, background:pal.soft}}>
+          {pal.cute && (<><Sparkle top={14} left={"18%"} size={14} delay={0} /><Sparkle top={30} left={"82%"} size={18} delay={0.7} /><Sparkle top={86} left={"8%"} size={12} delay={1.3} /></>)}
           <div style={S.heroRow}>
-            <Mascot type={spiritKey} color={spirit.color} size={86} />
+            {pal.cute ? <Mascot type={spiritKey} color={pal.accent} size={80} /> : <SimpleMark color={pal.accent} soft={pal.surface} size={64} />}
             <div style={{flex:1, minWidth:0}}>
-              <div style={{...S.pill, background:spirit.color}}>你的專屬語文小教練</div>
-              <div style={{...S.heroName, color:spirit.deep}}>現在陪著你的是:{spirit.tag}的【{spirit.name}】</div>
+              <div style={{...S.pill, background:pal.accent, color:pal.onAccent}}>你的寫作小教練</div>
+              <div style={{...S.heroName, color:pal.deep}}>{spirit.tag}的【{spirit.name}】</div>
             </div>
           </div>
-          <div style={{...S.heroQuote, color:spirit.deep}}>「{spirit.intro}」</div>
+          <div style={{...S.heroQuote, color:pal.deep}}>「{spirit.intro}」</div>
         </div>
 
         <div style={S.switchRow}>
-          <span style={S.switchLabel}>切換精靈</span>
-          {Object.entries(SPIRITS).map(([k,s]) => {
-            const on = k === spiritKey;
-            return <button key={k} onClick={()=>setSpiritKey(k)}
-              style={{...S.spiritChip, borderColor:on?s.color:"#EADFE6", background:on?s.soft:"#fff",
-                color:on?s.deep:"#9A8FA0", transform:on?"translateY(-2px)":"none"}}>
-              <Mascot type={k} color={s.color} size={26} animate={false} />{s.name}
-            </button>;
-          })}
+          <span style={S.switcherLabel}>切換教練</span>
+          {Object.entries(SPIRITS).map(([k,s])=>{ const on=k===spiritKey; return (
+            <button key={k} onClick={()=>setSpiritKey(k)} style={{...S.spiritChip, borderColor:on?pal.accent:pal.border, background:on?pal.soft:pal.surface, color:on?pal.deep:pal.muted}}>
+              {pal.cute ? <Mascot type={k} color={s.color} size={26} animate={false} /> : <span style={{width:10,height:10,borderRadius:999,background:pal.accent,display:"inline-block"}} />}{s.name}
+            </button>
+          );})}
         </div>
 
         <div style={S.blurbCard}>
-          <div style={{...S.blurbTitle, color:spirit.deep}}>{cfg.title}</div>
+          <div style={{...S.blurbTitle, color:pal.deep}}>{modeName(cfg)}</div>
           <div style={S.blurbText}>{cfg.blurb}</div>
         </div>
 
         <div style={S.inputLabel}>{cfg.inputLabel || "輸入你想練習的句子:"}</div>
-        <textarea value={text} onChange={(e)=>setText(e.target.value)} placeholder={cfg.placeholder}
-          rows={3} style={S.textarea} />
+        <textarea value={text} onChange={(e)=>setText(e.target.value)} placeholder={cfg.placeholder} rows={3} style={S.textarea} />
+
+        {mode==="argue" && ISSUE_TOPICS[stage] && (
+          <div style={{marginTop:10}}>
+            <div style={{...S.switcherLabel, margin:"0 2px 6px"}}>議題類別(點一個來腦力激盪):</div>
+            <div style={S.exampleRow}>
+              {ISSUE_TOPICS[stage].map((topic,i)=>(
+                <button key={i} style={S.exChip} onClick={()=>{setText(topic);}}>{topic}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={S.toolRow}>
           {voiceSupported && (
-            <button onClick={toggleVoice}
-              style={{...S.toolBtn, borderColor:spirit.color,
-                background:listening?spirit.color:"#fff", color:listening?"#fff":spirit.deep,
-                animation:listening?"pulse 1.2s ease-in-out infinite":"none"}}>
-              <MicIcon color={listening?"#fff":spirit.deep} />{listening?"停止":"用說的"}
+            <button onClick={toggleVoice} style={{...S.toolBtn, borderColor:pal.accent, background:listening?pal.accent:pal.surface, color:listening?pal.onAccent:pal.deep, animation:listening?"pulse 1.2s ease-in-out infinite":"none"}}>
+              <MicIcon color={listening?pal.onAccent:pal.deep} />{listening?"停止":"用說的"}
             </button>
           )}
-          <button onClick={pickPhoto} disabled={photoLoading}
-            style={{...S.toolBtn, borderColor:spirit.color, background:"#fff", color:spirit.deep,
-              opacity:photoLoading?0.6:1}}>
-            <CamIcon color={spirit.deep} />{photoLoading?"讀照片中…":"拍照輸入"}
+          <button onClick={pickPhoto} disabled={photoLoading} style={{...S.toolBtn, borderColor:pal.accent, background:pal.surface, color:pal.deep, opacity:photoLoading?0.6:1}}>
+            <CamIcon color={pal.deep} />{photoLoading?"讀照片中…":"拍照輸入"}
           </button>
-          <input type="file" accept="image/*" capture="environment" ref={fileInputRef}
-            onChange={onPhoto} style={{display:"none"}} />
+          <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={onPhoto} style={{display:"none"}} />
         </div>
-        {inputMsg && <div style={{...S.inputMsg, color:spirit.deep}}>{inputMsg}</div>}
+        {inputMsg && <div style={{...S.inputMsg, color:pal.deep}}>{inputMsg}</div>}
 
         <div style={S.exampleRow}>
-          {cfg.examples.map((ex,i)=>(
-            <button key={i} style={S.exChip} onClick={()=>setText(ex)}>
-              {ex.length>12 ? ex.slice(0,12)+"…" : ex}</button>
-          ))}
+          {cfg.examples.map((ex,i)=>(<button key={i} style={S.exChip} onClick={()=>setText(ex)}>{ex.length>12?ex.slice(0,12)+"…":ex}</button>))}
         </div>
 
-        <button onClick={castMagic} disabled={loading||!text.trim()}
-          style={{...S.castBtn, background:spirit.color, opacity:(loading||!text.trim())?0.55:1,
-            cursor:(loading||!text.trim())?"default":"pointer"}}>
+        <button onClick={castMagic} disabled={loading||!text.trim()} style={{...S.castBtn, background:pal.accent, color:pal.onAccent, opacity:(loading||!text.trim())?0.55:1, cursor:(loading||!text.trim())?"default":"pointer"}}>
           {loading ? "施展魔法中…" : (cfg.btn || "變身!")}
         </button>
 
         {loading && (
           <div style={S.loadingBox}>
-            <Mascot type={spiritKey} color={spirit.color} size={56} />
-            <div style={S.dots}>
-              <span style={{...S.dot, background:spirit.color}} />
-              <span style={{...S.dot, background:spirit.color, animationDelay:"0.2s"}} />
-              <span style={{...S.dot, background:spirit.color, animationDelay:"0.4s"}} />
-            </div>
+            {pal.cute ? <Mascot type={spiritKey} color={pal.accent} size={56} /> : <SimpleMark color={pal.accent} soft={pal.surface} size={48} />}
+            <div style={S.dots}><span style={{...S.dot, background:pal.accent}} /><span style={{...S.dot, background:pal.accent, animationDelay:"0.2s"}} /><span style={{...S.dot, background:pal.accent, animationDelay:"0.4s"}} /></div>
           </div>
         )}
 
@@ -416,9 +428,9 @@ function App() {
 
         {result && !loading && result.ok === false && (
           <div style={S.resultWrap}>
-            <div style={{...S.cheerCard, background:spirit.soft, color:spirit.deep, marginTop:0}}>
-              <Mascot type={spiritKey} color={spirit.color} size={44} animate={false} />
-              <span>{result.redirect || "我們在作文魔法屋只幫你做寫作練習喔!請給我一句你想練習的句子吧!"}</span>
+            <div style={{...S.cheerCard, background:pal.soft, color:pal.deep}}>
+              {pal.cute ? <Mascot type={spiritKey} color={pal.accent} size={44} animate={false} /> : <SimpleMark color={pal.accent} soft={pal.surface} size={40} />}
+              <span>{result.redirect || "我們在作文魔法屋只幫你做寫作練習喔!請給我一個適合的題目或句子吧!"}</span>
             </div>
           </div>
         )}
@@ -426,50 +438,40 @@ function App() {
         {result && !loading && result.ok !== false && (
           <div style={S.resultWrap}>
             {result.upgraded && (
-              <div style={{...S.resultTop, borderColor:spirit.color}}>
-                <div style={{...S.resultTag, color:spirit.deep}}>變身完成</div>
+              <div style={{...S.resultTop, borderColor:pal.accent}}>
+                <div style={{...S.resultTag, color:pal.deep}}>完成</div>
                 <div style={S.upgraded}>{result.upgraded}</div>
               </div>
             )}
-            {!result.upgraded && cfg.resultHint && (
-              <div style={{...S.hintLine, color:spirit.deep}}>{cfg.resultHint}</div>
-            )}
+            {!result.upgraded && cfg.resultHint && (<div style={{...S.hintLine, color:pal.deep}}>{cfg.resultHint}</div>)}
             {Array.isArray(result.items) && result.items.map((it,i)=>(
               <div key={i} style={{...S.idiomCard, animationDelay:`${i*0.08}s`}}>
-                <div style={{...S.idiomWord, background:spirit.soft, color:spirit.deep}}>{it.word}</div>
+                <div style={{...S.idiomWord, background:pal.soft, color:pal.deep}}>{it.word}</div>
                 <div style={S.idiomBody}>
-                  <div><b style={{color:spirit.deep}}>{(cfg.itemLabels&&cfg.itemLabels.meaning)||"說明"}:</b>{it.meaning}</div>
-                  {it.why && <div style={{marginTop:4}}><b style={{color:spirit.deep}}>{(cfg.itemLabels&&cfg.itemLabels.why)||"提示"}:</b>{it.why}</div>}
+                  <div><b style={{color:pal.deep}}>{(cfg.itemLabels&&cfg.itemLabels.meaning)||"說明"}:</b>{it.meaning}</div>
+                  {it.why && <div style={{marginTop:4}}><b style={{color:pal.deep}}>{(cfg.itemLabels&&cfg.itemLabels.why)||"提示"}:</b>{it.why}</div>}
                 </div>
               </div>
             ))}
             {Array.isArray(result.questions) && result.questions.map((q,i)=>(
               <div key={i} style={{...S.qCard, animationDelay:`${i*0.08}s`}}>
-                <div style={{...S.qNum, background:spirit.soft, color:spirit.deep}}>{i+1}</div>
+                <div style={{...S.qNum, background:pal.soft, color:pal.deep}}>{i+1}</div>
                 <div style={S.qText}>{q}</div>
               </div>
             ))}
             {result.cheer && (
-              <div style={{...S.cheerCard, background:spirit.soft, color:spirit.deep}}>
-                <Mascot type={spiritKey} color={spirit.color} size={44} animate={false} />
+              <div style={{...S.cheerCard, background:pal.soft, color:pal.deep}}>
+                {pal.cute ? <Mascot type={spiritKey} color={pal.accent} size={44} animate={false} /> : <SimpleMark color={pal.accent} soft={pal.surface} size={40} />}
                 <span>{result.cheer}</span>
               </div>
             )}
             <div style={S.resultActions}>
-              <button onClick={copyResult}
-                style={{...S.toolBtn, borderColor:spirit.color, background:"#fff", color:spirit.deep}}>
-                <CopyIcon color={spirit.deep} />複製給老師看
-              </button>
+              <button onClick={copyResult} style={{...S.toolBtn, borderColor:pal.accent, background:pal.surface, color:pal.deep}}><CopyIcon color={pal.deep} />複製給老師看</button>
               {(typeof window!=="undefined" && window.speechSynthesis) && (
-                <button onClick={toggleSpeak}
-                  style={{...S.toolBtn, borderColor:spirit.color,
-                    background:speaking?spirit.color:"#fff", color:speaking?"#fff":spirit.deep,
-                    animation:speaking?"pulse 1.2s ease-in-out infinite":"none"}}>
-                  <SpeakIcon color={speaking?"#fff":spirit.deep} />{speaking?"停止":"念給你聽"}
-                </button>
+                <button onClick={toggleSpeak} style={{...S.toolBtn, borderColor:pal.accent, background:speaking?pal.accent:pal.surface, color:speaking?pal.onAccent:pal.deep, animation:speaking?"pulse 1.2s ease-in-out infinite":"none"}}><SpeakIcon color={speaking?pal.onAccent:pal.deep} />{speaking?"停止":"念給你聽"}</button>
               )}
             </div>
-            {copyMsg && <div style={{...S.inputMsg, color:spirit.deep}}>{copyMsg}</div>}
+            {copyMsg && <div style={{...S.inputMsg, color:pal.deep}}>{copyMsg}</div>}
           </div>
         )}
 
@@ -479,53 +481,84 @@ function App() {
   );
 }
 
-/* 跨平台中文字型 fallback chain（kit 靜態頁示範 5.4） */
-const baseFont = "'Noto Sans TC', system-ui, -apple-system, 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans CJK TC', 'Segoe UI', sans-serif";
-const S = {
-  root:{ fontFamily:baseFont, background:"radial-gradient(120% 120% at 50% 0%, #E6F5FF 0%, #F1FAFF 38%, #FFEFF6 100%)", minHeight:"100vh", padding:"calc(18px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))", boxSizing:"border-box" },
+function Root() {
+  const [view, setView] = useState("gate");
+  const [audience, setAudience] = useState("es");
+  const [stage, setStage] = useState("es");
+  const [theme, setTheme] = useState("cute");
+  if (view === "gate") return <Gate onEnter={(a,s,t)=>{ setAudience(a); setStage(s); setTheme(t); setView("app"); }} />;
+  return <Tool audience={audience} stage={stage} setStage={setStage} theme={theme} setTheme={setTheme} onExit={()=>setView("gate")} />;
+}
+
+/* ---------- 主題化樣式 ---------- */
+function makeStyles(pal) { return {
+  root:{ fontFamily:baseFont, background:pal.bg, color:pal.text, minHeight:"100vh", padding:"calc(14px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))", boxSizing:"border-box" },
   shell:{ maxWidth:460, margin:"0 auto" },
-  tabs:{ display:"flex", flexWrap:"wrap", gap:6, background:"rgba(255,255,255,0.5)", padding:5, borderRadius:18, marginBottom:16 },
+  topBar:{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, marginBottom:10, flexWrap:"wrap" },
+  exitBtn:{ border:"none", background:"transparent", color:pal.muted, fontFamily:baseFont, fontWeight:700, fontSize:13.5, cursor:"pointer", padding:"4px 2px" },
+  switcher:{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap", marginBottom:10 },
+  switcherLabel:{ fontSize:12.5, color:pal.muted, fontWeight:700 },
+  miniBtn:{ border:"2px solid", borderRadius:999, padding:"6px 14px", fontFamily:baseFont, fontWeight:700, fontSize:13.5, cursor:"pointer", transition:"all .15s" },
+  tabs:{ display:"flex", flexWrap:"wrap", gap:6, background:pal.tabsBg, padding:5, borderRadius:18, marginBottom:16 },
   tab:{ flex:"1 1 calc(50% - 3px)", border:"none", borderRadius:14, padding:"11px 8px", fontFamily:baseFont, fontWeight:700, fontSize:15, cursor:"pointer", transition:"all .2s" },
-  heroCard:{ position:"relative", borderRadius:28, padding:"20px 18px", overflow:"hidden", boxShadow:"0 10px 28px rgba(180,120,160,0.16)" },
+  heroCard:{ position:"relative", borderRadius:28, padding:"20px 18px", overflow:"hidden", boxShadow:pal.shadow },
   heroRow:{ display:"flex", gap:12, alignItems:"center" },
-  pill:{ display:"inline-block", color:"#fff", fontWeight:700, fontSize:12, padding:"4px 12px", borderRadius:999, marginBottom:6 },
+  pill:{ display:"inline-block", fontWeight:700, fontSize:12, padding:"4px 12px", borderRadius:999, marginBottom:6 },
   heroName:{ fontWeight:900, fontSize:20, lineHeight:1.3 },
   heroQuote:{ marginTop:14, fontSize:14.5, lineHeight:1.7, fontWeight:500, opacity:0.92 },
   switchRow:{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", margin:"16px 2px" },
-  switchLabel:{ fontSize:13, color:"#9A8FA0", fontWeight:700 },
   spiritChip:{ display:"inline-flex", alignItems:"center", gap:6, border:"2.5px solid", borderRadius:999, padding:"6px 14px 6px 8px", fontFamily:baseFont, fontWeight:700, fontSize:14, cursor:"pointer", transition:"all .18s" },
-  blurbCard:{ background:"#fff", borderRadius:22, padding:"16px 18px", boxShadow:"0 6px 18px rgba(150,130,160,0.1)" },
+  blurbCard:{ background:pal.surface, borderRadius:22, padding:"16px 18px", boxShadow:pal.shadow },
   blurbTitle:{ fontWeight:900, fontSize:17, marginBottom:8 },
-  blurbText:{ fontSize:14, lineHeight:1.7, color:"#6B5F6E" },
-  inputLabel:{ margin:"18px 4px 8px", fontSize:14, fontWeight:700, color:"#6B5F6E" },
-  textarea:{ width:"100%", boxSizing:"border-box", border:"2.5px solid #F0E4EE", borderRadius:18, padding:"14px 16px", fontFamily:baseFont, fontSize:16, lineHeight:1.6, resize:"vertical", outline:"none", background:"#fff", color:"#3A2E3F" },
+  blurbText:{ fontSize:14, lineHeight:1.7, color:pal.muted },
+  inputLabel:{ margin:"18px 4px 8px", fontSize:14, fontWeight:700, color:pal.muted },
+  textarea:{ width:"100%", boxSizing:"border-box", border:"2.5px solid "+pal.border, borderRadius:18, padding:"14px 16px", fontFamily:baseFont, fontSize:16, lineHeight:1.6, resize:"vertical", outline:"none", background:pal.surface, color:pal.text },
   toolRow:{ display:"flex", gap:8, flexWrap:"wrap", margin:"10px 2px 0" },
   toolBtn:{ display:"inline-flex", alignItems:"center", gap:6, border:"2px solid", borderRadius:999, padding:"9px 16px", fontFamily:baseFont, fontWeight:700, fontSize:14, cursor:"pointer", transition:"all .15s" },
   inputMsg:{ margin:"8px 4px 0", fontSize:13.5, fontWeight:700, lineHeight:1.5 },
   exampleRow:{ display:"flex", gap:8, flexWrap:"wrap", margin:"10px 2px 0" },
-  exChip:{ border:"2px dashed #E3D3DE", background:"#fff", borderRadius:999, padding:"9px 14px", fontFamily:baseFont, fontSize:13, color:"#8A7C8C", cursor:"pointer" },
-  castBtn:{ width:"100%", marginTop:16, border:"none", borderRadius:20, padding:"16px", color:"#fff", fontFamily:baseFont, fontWeight:900, fontSize:18, letterSpacing:2, boxShadow:"0 10px 22px rgba(160,110,140,0.28)" },
+  exChip:{ border:"2px dashed "+pal.border, background:pal.surface, borderRadius:999, padding:"9px 14px", fontFamily:baseFont, fontSize:13, color:pal.muted, cursor:"pointer" },
+  castBtn:{ width:"100%", marginTop:16, border:"none", borderRadius:20, padding:"16px", fontFamily:baseFont, fontWeight:900, fontSize:18, letterSpacing:2, boxShadow:pal.shadow },
   loadingBox:{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, padding:"22px 0 6px" },
   dots:{ display:"flex", gap:8 },
   dot:{ width:11, height:11, borderRadius:999, display:"inline-block", animation:"dotjump 1s ease-in-out infinite" },
-  errorBox:{ marginTop:16, background:"#FFF0E8", border:"2px solid #FFD3B6", borderRadius:16, padding:"14px 16px", color:"#B5651D", fontSize:14, lineHeight:1.6, textAlign:"center", fontWeight:600 },
+  errorBox:{ marginTop:16, background:pal.soft, border:"2px solid "+pal.accent, borderRadius:16, padding:"14px 16px", color:pal.deep, fontSize:14, lineHeight:1.6, textAlign:"center", fontWeight:600 },
   resultWrap:{ marginTop:18 },
-  resultTop:{ background:"#fff", borderRadius:22, padding:"16px 18px", border:"2.5px solid", boxShadow:"0 8px 22px rgba(150,120,160,0.14)", animation:"rise .4s ease both" },
+  resultTop:{ background:pal.surface, borderRadius:22, padding:"16px 18px", border:"2.5px solid", boxShadow:pal.shadow, animation:"rise .4s ease both" },
   resultTag:{ fontWeight:900, fontSize:13, letterSpacing:1, marginBottom:6 },
+  upgraded:{ fontSize:18, lineHeight:1.8, fontWeight:700, color:pal.text },
   hintLine:{ fontWeight:800, fontSize:15, margin:"2px 4px 4px", lineHeight:1.5 },
-  qCard:{ display:"flex", gap:12, alignItems:"flex-start", background:"#fff", borderRadius:18, padding:"14px 16px", marginTop:12, boxShadow:"0 5px 14px rgba(150,130,160,0.1)", animation:"rise .4s ease both" },
-  qNum:{ flexShrink:0, width:30, height:30, borderRadius:999, fontWeight:900, fontSize:15, display:"flex", alignItems:"center", justifyContent:"center" },
-  qText:{ fontSize:15.5, lineHeight:1.7, color:"#5E5263", paddingTop:3 },
-  upgraded:{ fontSize:18, lineHeight:1.8, fontWeight:700, color:"#3A2E3F" },
-  idiomCard:{ display:"flex", gap:12, background:"#fff", borderRadius:18, padding:"14px 16px", marginTop:12, boxShadow:"0 5px 14px rgba(150,130,160,0.1)", animation:"rise .4s ease both" },
+  idiomCard:{ display:"flex", gap:12, background:pal.surface, borderRadius:18, padding:"14px 16px", marginTop:12, boxShadow:pal.shadow, animation:"rise .4s ease both" },
   idiomWord:{ flexShrink:0, alignSelf:"flex-start", fontWeight:900, fontSize:16, padding:"8px 12px", borderRadius:14, minWidth:56, textAlign:"center" },
-  idiomBody:{ fontSize:14, lineHeight:1.7, color:"#5E5263" },
+  idiomBody:{ fontSize:14, lineHeight:1.7, color:pal.text },
+  qCard:{ display:"flex", gap:12, alignItems:"flex-start", background:pal.surface, borderRadius:18, padding:"14px 16px", marginTop:12, boxShadow:pal.shadow, animation:"rise .4s ease both" },
+  qNum:{ flexShrink:0, width:30, height:30, borderRadius:999, fontWeight:900, fontSize:15, display:"flex", alignItems:"center", justifyContent:"center" },
+  qText:{ fontSize:15.5, lineHeight:1.7, color:pal.text, paddingTop:3 },
   cheerCard:{ display:"flex", alignItems:"center", gap:10, borderRadius:20, padding:"14px 16px", marginTop:14, fontSize:15, fontWeight:700, lineHeight:1.6, animation:"rise .4s ease both" },
   resultActions:{ display:"flex", gap:8, flexWrap:"wrap", marginTop:14 },
-  foot:{ textAlign:"center", marginTop:22, fontSize:12, color:"#B6A8B8", fontWeight:600, letterSpacing:1 },
+  foot:{ textAlign:"center", marginTop:22, fontSize:12, color:pal.muted, fontWeight:600, letterSpacing:1 },
+}; }
+
+/* ---------- 門檻頁靜態樣式 ---------- */
+const G = {
+  root:{ fontFamily:baseFont, minHeight:"100vh", background:"radial-gradient(120% 120% at 50% 0%, #E6F5FF 0%, #F1FAFF 40%, #FFEFF6 100%)", display:"flex", alignItems:"center", justifyContent:"center", padding:"24px 16px", boxSizing:"border-box" },
+  inner:{ width:"100%", maxWidth:380, textAlign:"center" },
+  brand:{ fontWeight:900, fontSize:18, color:"#54B9EC", letterSpacing:1 },
+  title:{ fontWeight:900, fontSize:30, color:"#3A2E3F", marginTop:4 },
+  sub:{ fontSize:15, color:"#9A8FA0", fontWeight:600, margin:"10px 0 22px" },
+  cardES:{ width:"100%", border:"none", borderRadius:24, padding:"22px", marginBottom:14, background:"linear-gradient(135deg,#FFE4EE,#DCF1FC)", color:"#C84B77", cursor:"pointer", display:"flex", flexDirection:"column", gap:4, boxShadow:"0 10px 24px rgba(180,120,160,0.18)" },
+  cardMID:{ width:"100%", border:"none", borderRadius:24, padding:"22px", background:"linear-gradient(135deg,#E7EEF2,#D7E3EA)", color:"#39647F", cursor:"pointer", display:"flex", flexDirection:"column", gap:4, boxShadow:"0 10px 24px rgba(90,120,140,0.18)" },
+  cardBig:{ fontWeight:900, fontSize:24 },
+  cardSmall:{ fontSize:13.5, fontWeight:600, opacity:0.85 },
+  label:{ fontSize:15, fontWeight:700, color:"#3A2E3F", margin:"6px 0 12px" },
+  input:{ width:"100%", boxSizing:"border-box", border:"2.5px solid #D7E3EA", borderRadius:16, padding:"14px 16px", fontFamily:baseFont, fontSize:20, textAlign:"center", letterSpacing:6, outline:"none", color:"#3A2E3F" },
+  err:{ color:"#C0392B", fontSize:13.5, fontWeight:700, marginTop:10 },
+  primary:{ width:"100%", border:"none", borderRadius:18, padding:"15px", marginTop:12, background:"#5C8AA6", color:"#fff", fontFamily:baseFont, fontWeight:900, fontSize:17, letterSpacing:1, cursor:"pointer" },
+  ghost:{ width:"100%", border:"none", background:"transparent", color:"#9A8FA0", fontFamily:baseFont, fontWeight:700, fontSize:14, marginTop:10, cursor:"pointer" },
+  foot:{ marginTop:24, fontSize:12, color:"#B6A8B8", fontWeight:600 },
 };
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(<Root />);
 </script>
 </body>
 </html>

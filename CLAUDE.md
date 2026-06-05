@@ -16,9 +16,9 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.7.0
+- **版本:** V0.9.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
-- **一句話定位:** 給國小學生的 AI 寫作小幫手——把普通句子變成含成語/感官描寫的句子,三精靈不同語氣;英文品牌名 WordWand,中文名作文魔法屋(六種寫作練習模式)。
+- **一句話定位:** AI 作文練習小幫手,主打國小、可切國中/高中;六~七種寫作模式 + 三精靈 + 分齡安全;英文品牌 WordWand、中文名作文魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
 - **入口點:** 前端 `docs/index.html` 的 `App()`;後端 `main.py`(repo 根目錄)的 `app`(`POST /magic`)
 
@@ -52,7 +52,15 @@
 | 精靈人格語氣 | `main.py` 的 `PERSONAS`(改這裡才會變語氣,前端只是顯示) |
 | 六模式說明/範例/按鈕/欄位標籤 | `docs/index.html` 的 `MODES`(每模式含 title/btn/inputLabel/itemLabels/resultHint) |
 | AI 任務指令 / 回傳格式(六模式) | `main.py` 的 `TASKS` / `SCHEMA_OK` |
-| 兒童安全規則(範圍鎖定 + 內容把關) | `main.py` 的 `SAFETY` 常數(放 prompt 最前面,最優先) |
+| 安全紅線(全齡通用) | `main.py` 的 `SAFETY_BASE` |
+| 各學段題材/用字規則 | `main.py` 的 `STAGES`(es/jh/sh) |
+| 議論模式(國中/高中限定) | `main.py` TASKS/SCHEMA 的 `argue`;前端 MODES.argue 的 `stages:["jh","sh"]` |
+| 身分門檻頁 | `docs/index.html` 的 `Gate` 元件 + `Root`(view: gate/app) |
+| 中學通行碼 | `docs/index.html` 的 `MID_PASSWORD`(前端簡易鎖,改這裡;非資安防線) |
+| 視覺主題(中學三風格) | `docs/index.html` 的 `THEMES` / `resolvePalette` / `makeStyles(pal)` |
+| 模式正式名稱(中學) | MODES 的 `titleFormal`;`modeName()` 依 audience 切換 |
+| 議題類別(議論用) | `docs/index.html` 的 `ISSUE_TOPICS`(jh/sh 各一組,耐久思辨題非新聞) |
+| 學段切換 | `stage` state / `changeStage` / `visibleModes`(議論限 jh/sh) |
 | ok=false 引導畫面 | `docs/index.html` 結果區「result.ok === false」分支 |
 | 語音輸入 | `docs/index.html` 的 `toggleVoice`(瀏覽器 Web Speech API,zh-TW) |
 | 拍照輸入 | 前端 `onPhoto` / 後端 `main.py` 的 `/read-image`(Claude 看圖 OCR) |
@@ -62,7 +70,7 @@
 | 速率限制次數/視窗 | `main.py` 的 `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW` |
 | 介面樣式 | `docs/index.html` 結尾的 `S` 樣式物件 |
 
-> **契約提醒:** 前端送 `{spirit, mode, text}`;後端依 mode 回不同形狀(都含 `ok`):
+> **契約提醒:** 前端送 `{spirit, mode, stage, text}`(stage = es/jh/sh,預設 es);後端依 mode 回不同形狀(都含 `ok`):
 > - idiom/senses → `{ok:true, upgraded, items[], cheer}`
 > - gym(健身房)→ `{ok:true, items[], cheer}`(items=「可改進點+說明+怎麼改」)
 > - grow(長大樹)→ `{ok:true, questions[], cheer}`(引導問題字串陣列)
@@ -164,6 +172,8 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.5.2 | 「句子長大樹」改名「魔法長大樹」(原本與句子健身房都以『句子』開頭,略重覆) |
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 | V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
+| V0.8.0 | 加學段切換(國小/國中/高中,預設國小):紅線全齡通用、題材/用字隨學段放寬、「只做寫作練習」scope 全齡不變;國中/高中多開「議論小教練」;模式依學段過濾顯示 |
+| V0.9.0 | 前端大改:入口門檻頁(國小直接進/中學需通行碼→選國中高中)、中學可切可愛/北歐極簡/科幻三主題(THEMES+makeStyles(pal))、中學模式用正式名(titleFormal)、議論加議題類別(ISSUE_TOPICS,耐久思辨題)、← 換身分回門檻。後端僅版號對齊(主題/密碼/議題皆前端) |
 
 ---
 
@@ -171,15 +181,31 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 
 > 設計原則(訓練作文能力):優先做「教學/鷹架型」功能(引導、提示、講原因),少做「代寫型」功能,否則只是給答案、訓練不到能力,也可能變成代寫工具。句子健身房/長大屋(V0.4.0)是此原則的落地。
 
-1. **主題快捷選單** — 第 1 名:靈感泡泡/藏寶圖的輸入是一個詞,給一排常見主題鈕用點的不用打,延續省力輸入方向、成本低。
-2. **修辭魔法** — 教譬喻/擬人/排比(再進階一階的表達力)。
-3. **成語寶庫(集點)** — 把學過的成語收集成冊,localStorage 存,練動機。
-4. 把精靈人格、六模式 TASKS/SCHEMA、SAFETY 抽成 `config.json`。
-5. 速率限制升跨 replica 版;模式變多考慮分頁可橫向滑動。
+1. **國小也加主題快捷選單** — 靈感發想/大綱規劃的輸入是一個詞,給常見題目鈕用點的不用打(中學議論已有議題類別,國小可比照給適齡題目)。
+2. **記住上次身分(選用)** — 目前每次重開都回門檻(公用電腦較安全);若是個人裝置,可用 localStorage 記住,但要權衡公用裝置誤用。
+3. **修辭魔法** — 教譬喻/擬人/排比。
+4. 成語寶庫(集點,localStorage)。
+5. 把精靈人格、模式 TASKS/SCHEMA、STAGES、SAFETY 抽成 `config.json`(內容越來越多,值得做)。
+6. 速率限制升跨 replica 版;模式變多考慮分頁橫向滑動。
 
 ---
 
 ## 八、升版必讀(如有)
+
+### V0.9.0 門檻頁 + 主題系統(維護重點)
+
+- 結構:`Root`(管 view=gate/app 與 audience/stage/theme)→ 進 `Gate` 或 `Tool`。國小 audience=es、theme 固定 cute;中學 audience=mid、可切 theme。
+- 顏色全部走 `resolvePalette(theme, spiritKey)` → `makeStyles(pal)`。**改配色改 THEMES 即可**,不要再把顏色寫死進 JSX。cute 主題的 accent 取自精靈色;北歐/科幻用主題色(精靈僅影響語氣與圖示)。
+- `MID_PASSWORD` 是前端簡易鎖,**不是資安防線**(原始碼公開)。可接受,因為後端紅線全齡通用;不要把它當真正權限控管。
+- 議題類別 `ISSUE_TOPICS` 是耐久思辨題、**刻意不接即時新聞**(對未成年餵即時時事風險高)。要加題目就改這個常數。
+- 後端無關主題/密碼;只有 stage(es/jh/sh)與 argue 模式跟它配合,改前端風格不需動後端。
+
+### V0.8.0 學段切換(維護重點)
+
+- 安全是分層的:`SAFETY_BASE`(全齡紅線 + 只做寫作練習)永遠套用;`STAGES[stage].clause` 只放寬「題材廣度 + 用字深淺」。**改安全規則時,紅線與『只做寫作練習』不可下放到 stage clause**,否則高學段會破洞。
+- 預設 `stage="es"`(最嚴)。切到高學段是放寬題材,不是放寬紅線。
+- 模式依學段顯示:MODES 加 `stages:[...]` 即限定學段(無此欄=全學段)。新增學段限定模式要同步:後端 TASKS/SCHEMA + 前端 MODES.stages。
+- 切換學段若當前模式不屬該學段,`changeStage` 會自動跳到該學段第一個模式。
 
 ### V0.6.0 省力輸入(維護重點)
 
