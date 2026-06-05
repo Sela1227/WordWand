@@ -35,7 +35,7 @@
 <script type="text/babel">
 const { useState, useRef } = React;
 
-const VERSION = "V0.6.0";
+const VERSION = "V0.7.0";
 
 /* ====================================================================== */
 /*  ★★★ 唯一需要你修改的地方:把下面換成你的 Railway 後端網址 ★★★         */
@@ -153,6 +153,22 @@ function CamIcon({ color }) {
     </svg>
   );
 }
+function CopyIcon({ color }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="11" height="11" rx="2.5" />
+      <path d="M5 15 H4.5 A1.5 1.5 0 0 1 3 13.5 V4.5 A1.5 1.5 0 0 1 4.5 3 h9 A1.5 1.5 0 0 1 15 4.5 V5" />
+    </svg>
+  );
+}
+function SpeakIcon({ color }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 9 v6 h4 l5 4 V5 l-5 4 z" />
+      <path d="M17 8 a5 5 0 0 1 0 8" />
+    </svg>
+  );
+}
 
 function App() {
   const [spiritKey, setSpiritKey] = useState("nini");
@@ -164,10 +180,63 @@ function App() {
   const [inputMsg, setInputMsg] = useState("");
   const [listening, setListening] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
+  const [copyMsg, setCopyMsg] = useState("");
+  const [speaking, setSpeaking] = useState(false);
   const recognitionRef = useRef(null);
   const fileInputRef = useRef(null);
   const spirit = SPIRITS[spiritKey];
   const cfg = MODES[mode];
+
+  function stopSpeak() { if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel(); setSpeaking(false); }
+
+  function buildExportText(r) {
+    const lines = [];
+    if (r.upgraded) lines.push(r.upgraded);
+    if (Array.isArray(r.items)) r.items.forEach((it) => {
+      let line = "・" + it.word + "：" + it.meaning;
+      if (it.why) line += "（" + ((cfg.itemLabels && cfg.itemLabels.why) || "提示") + "：" + it.why + "）";
+      lines.push(line);
+    });
+    if (Array.isArray(r.questions)) r.questions.forEach((q, i) => lines.push((i + 1) + ". " + q));
+    return lines.join("\n");
+  }
+
+  function buildSpeechText(r) {
+    const parts = [];
+    if (r.upgraded) parts.push(r.upgraded);
+    if (Array.isArray(r.items)) r.items.forEach((it) => parts.push(it.word + "。" + it.meaning + (it.why ? "。" + it.why : "")));
+    if (Array.isArray(r.questions)) r.questions.forEach((q) => parts.push(q));
+    return parts.join("。");
+  }
+
+  async function copyResult() {
+    if (!result) return;
+    const txt = buildExportText(result);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(txt);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select(); document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopyMsg("已複製!貼到哪裡都可以給老師看");
+    } catch(_) { setCopyMsg("複製失敗,手動選取一下也可以喔!"); }
+    setTimeout(() => setCopyMsg(""), 2500);
+  }
+
+  function toggleSpeak() {
+    if (typeof window === "undefined" || !window.speechSynthesis || !result) return;
+    if (speaking) { stopSpeak(); return; }
+    const u = new SpeechSynthesisUtterance(buildSpeechText(result));
+    u.lang = "zh-TW"; u.rate = 0.95;
+    u.onend = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    window.speechSynthesis.cancel();
+    setSpeaking(true);
+    window.speechSynthesis.speak(u);
+  }
 
   const SR = (typeof window !== "undefined") && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const voiceSupported = !!SR;
@@ -238,7 +307,7 @@ function App() {
       setError("還沒設定後端網址喔!請打開 docs/index.html,把 BACKEND_URL 換成你的 Railway 網址。");
       return;
     }
-    setLoading(true); setResult(null); setError("");
+    setLoading(true); setResult(null); setError(""); stopSpeak(); setCopyMsg("");
     try {
       const res = await fetch(`${BACKEND_URL}/magic`, {
         method:"POST",
@@ -259,7 +328,7 @@ function App() {
         <div style={S.tabs}>
           {Object.values(MODES).map((m) => {
             const on = m.key === mode;
-            return <button key={m.key} onClick={()=>{setMode(m.key);setResult(null);setError("");}}
+            return <button key={m.key} onClick={()=>{setMode(m.key);setResult(null);setError("");stopSpeak();setCopyMsg("");}}
               style={{...S.tab, background:on?"#fff":"transparent", color:on?spirit.deep:"#9A8FA0",
                 boxShadow:on?"0 6px 16px rgba(0,0,0,0.08)":"none"}}>{m.title}</button>;
           })}
@@ -386,6 +455,21 @@ function App() {
                 <span>{result.cheer}</span>
               </div>
             )}
+            <div style={S.resultActions}>
+              <button onClick={copyResult}
+                style={{...S.toolBtn, borderColor:spirit.color, background:"#fff", color:spirit.deep}}>
+                <CopyIcon color={spirit.deep} />複製給老師看
+              </button>
+              {(typeof window!=="undefined" && window.speechSynthesis) && (
+                <button onClick={toggleSpeak}
+                  style={{...S.toolBtn, borderColor:spirit.color,
+                    background:speaking?spirit.color:"#fff", color:speaking?"#fff":spirit.deep,
+                    animation:speaking?"pulse 1.2s ease-in-out infinite":"none"}}>
+                  <SpeakIcon color={speaking?"#fff":spirit.deep} />{speaking?"停止":"念給你聽"}
+                </button>
+              )}
+            </div>
+            {copyMsg && <div style={{...S.inputMsg, color:spirit.deep}}>{copyMsg}</div>}
           </div>
         )}
 
@@ -437,6 +521,7 @@ const S = {
   idiomWord:{ flexShrink:0, alignSelf:"flex-start", fontWeight:900, fontSize:16, padding:"8px 12px", borderRadius:14, minWidth:56, textAlign:"center" },
   idiomBody:{ fontSize:14, lineHeight:1.7, color:"#5E5263" },
   cheerCard:{ display:"flex", alignItems:"center", gap:10, borderRadius:20, padding:"14px 16px", marginTop:14, fontSize:15, fontWeight:700, lineHeight:1.6, animation:"rise .4s ease both" },
+  resultActions:{ display:"flex", gap:8, flexWrap:"wrap", marginTop:14 },
   foot:{ textAlign:"center", marginTop:22, fontSize:12, color:"#B6A8B8", fontWeight:600, letterSpacing:1 },
 };
 

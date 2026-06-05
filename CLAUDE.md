@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.6.0
+- **版本:** V0.7.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** 給國小學生的 AI 寫作小幫手——把普通句子變成含成語/感官描寫的句子,三精靈不同語氣;英文品牌名 WordWand,中文名作文魔法屋(六種寫作練習模式)。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -56,6 +56,7 @@
 | ok=false 引導畫面 | `docs/index.html` 結果區「result.ok === false」分支 |
 | 語音輸入 | `docs/index.html` 的 `toggleVoice`(瀏覽器 Web Speech API,zh-TW) |
 | 拍照輸入 | 前端 `onPhoto` / 後端 `main.py` 的 `/read-image`(Claude 看圖 OCR) |
+| 複製/朗讀結果 | `docs/index.html` 的 `copyResult` / `toggleSpeak`(buildExportText/buildSpeechText 整理輸出) |
 | 模型、單句長度上限 | `main.py` 的 `MODEL` / `len(text) > 200` |
 | 允許的前端來源(CORS) | `main.py` 的 `ALLOWED_ORIGINS` |
 | 速率限制次數/視窗 | `main.py` 的 `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW` |
@@ -162,6 +163,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.5.1 | 分頁依作文流程重排(靈感→大綱→健身房→長大樹→成語→五感,代寫類放後)、預設開靈感泡泡;修正每個模式 placeholder 與第一顆範例重覆 |
 | V0.5.2 | 「句子長大樹」改名「魔法長大樹」(原本與句子健身房都以『句子』開頭,略重覆) |
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
+| V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
 
 ---
 
@@ -169,12 +171,11 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 
 > 設計原則(訓練作文能力):優先做「教學/鷹架型」功能(引導、提示、講原因),少做「代寫型」功能,否則只是給答案、訓練不到能力,也可能變成代寫工具。句子健身房/長大屋(V0.4.0)是此原則的落地。
 
-1. **結果加「複製給老師看」+「念給你聽」** — 第 1 名:六模式都產文字,複製出去最常用;念出來(瀏覽器語音合成,免費、iOS 也支援)對讀字慢的小朋友很有感,兩個一起做。
-2. **主題快捷選單** — 靈感泡泡/藏寶圖的輸入是一個詞,給一排常見主題鈕用點的不用打(輸入再省力,延續 V0.6.0 方向)。
-3. **修辭魔法** — 教譬喻/擬人/排比(再進階一階的表達力)。
-4. **成語寶庫(集點)** — 把學過的成語收集成冊,localStorage 存,練動機。
-5. 把精靈人格、六模式 TASKS/SCHEMA、SAFETY 抽成 `config.json`。
-6. 速率限制升跨 replica 版;模式變多考慮分頁可橫向滑動。
+1. **主題快捷選單** — 第 1 名:靈感泡泡/藏寶圖的輸入是一個詞,給一排常見主題鈕用點的不用打,延續省力輸入方向、成本低。
+2. **修辭魔法** — 教譬喻/擬人/排比(再進階一階的表達力)。
+3. **成語寶庫(集點)** — 把學過的成語收集成冊,localStorage 存,練動機。
+4. 把精靈人格、六模式 TASKS/SCHEMA、SAFETY 抽成 `config.json`。
+5. 速率限制升跨 replica 版;模式變多考慮分頁可橫向滑動。
 
 ---
 
