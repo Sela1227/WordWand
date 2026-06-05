@@ -1,0 +1,12 @@
+{
+  "name": "WordWand 成語魔法屋",
+  "short_name": "WordWand",
+  "description": "陪小朋友把普通句子變成漂亮成語的寫作小幫手",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "theme_color": "#FF8FAB",
+  "background_color": "#FFF6EC",
+  "display": "standalone",
+  "start_url": "./"
+}

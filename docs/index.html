@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WordWand 成語魔法屋</title>
+<!-- 自訂 favicon（本專案不套 SELA logo，使用專屬可愛標記）。相對路徑：GitHub Pages 子路徑安全（坑 #39） -->
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="manifest" href="site.webmanifest" />
+<meta name="theme-color" content="#FF8FAB" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; }
+  #root { min-height: 100vh; }
+  @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+  @keyframes twinkle { 0%,100%{opacity:0.2;transform:scale(0.7)} 50%{opacity:1;transform:scale(1.1)} }
+  @keyframes dotjump { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-10px)} }
+  @keyframes rise { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState } = React;
+
+const VERSION = "V0.2.0";
+
+/* ====================================================================== */
+/*  ★★★ 唯一需要你修改的地方:把下面換成你的 Railway 後端網址 ★★★         */
+/*  例如:"https://chengyu-magic.up.railway.app"                          */
+/*  (Railway 專案的 root directory 設為 backend/)                        */
+/* ====================================================================== */
+const BACKEND_URL = "https://YOUR-APP.up.railway.app";
+
+/* 精靈「外觀」設定（人格 prompt 放在後端,前端只負責顯示） */
+const SPIRITS = {
+  nini: { name:"尼尼", tag:"溫柔引導", color:"#FF8FAB", soft:"#FFE3EC", deep:"#C9446E",
+    intro:"尼尼會溫柔地聽你說話。寫錯也沒有關係,我們一起慢慢找出好玩、漂亮的句子!" },
+  kiki: { name:"奇奇", tag:"博學小老師", color:"#4ECDC4", soft:"#D9F7F4", deep:"#1F8A82",
+    intro:"奇奇知道很多成語的小故事!把句子交給我,我會告訴你每個成語從哪裡來。" },
+  max:  { name:"麥克斯", tag:"活力滿點", color:"#FFB627", soft:"#FFF0CC", deep:"#C97E00",
+    intro:"麥克斯超有活力!我們一起把無聊的句子,變成超酷的成語魔法吧!" },
+};
+const MODES = {
+  idiom: { key:"idiom", title:"成語魔法屋",
+    blurb:"你常常寫「很生氣」、「哭得很慘」、「天氣很漂亮」嗎?把句子放進來,小精靈會幫你找出好用的成語!",
+    placeholder:"我今天考了一百分,心裡非常高興。",
+    examples:["我今天考了一百分,心裡非常高興。","弟弟把房間弄得很亂。","今天的夕陽真的好漂亮。"] },
+  senses:{ key:"senses", title:"五官寫作屋",
+    blurb:"好的描寫會用到眼睛、耳朵、鼻子、嘴巴和皮膚。把句子放進來,小精靈會幫你加上生動的感官描寫!",
+    placeholder:"我走進了廚房。",
+    examples:["我走進了廚房。","外面開始下雨了。","媽媽煮了一鍋湯。"] },
+};
+
+function Mascot({ type, color, size=72, animate=true }) {
+  const eye = "#3A2E3F";
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100"
+      style={{ animation: animate ? "bob 2.6s ease-in-out infinite" : "none" }}>
+      <ellipse cx="38" cy="92" rx="9" ry="6" fill={color} opacity="0.85" />
+      <ellipse cx="62" cy="92" rx="9" ry="6" fill={color} opacity="0.85" />
+      <path d="M50 12 C74 12 86 30 86 52 C86 76 70 90 50 90 C30 90 14 76 14 52 C14 30 26 12 50 12 Z" fill={color} />
+      <ellipse cx="50" cy="58" rx="24" ry="22" fill="#FFFFFF" opacity="0.4" />
+      <circle cx="30" cy="58" r="6" fill="#FF6F91" opacity="0.5" />
+      <circle cx="70" cy="58" r="6" fill="#FF6F91" opacity="0.5" />
+      {type==="nini" && (<>
+        <path d="M34 46 q5 6 10 0" stroke={eye} strokeWidth="3.5" fill="none" strokeLinecap="round" />
+        <path d="M56 46 q5 6 10 0" stroke={eye} strokeWidth="3.5" fill="none" strokeLinecap="round" />
+        <path d="M44 56 q6 5 12 0" stroke={eye} strokeWidth="3" fill="none" strokeLinecap="round" />
+        <path d="M40 16 l8 6 -8 6 z" fill="#FFFFFF" opacity="0.9" />
+        <path d="M60 16 l-8 6 8 6 z" fill="#FFFFFF" opacity="0.9" />
+        <circle cx="50" cy="22" r="3" fill="#FFFFFF" />
+      </>)}
+      {type==="kiki" && (<>
+        <circle cx="38" cy="48" r="3.5" fill={eye} />
+        <circle cx="62" cy="48" r="3.5" fill={eye} />
+        <circle cx="38" cy="48" r="10" fill="none" stroke={eye} strokeWidth="2.5" />
+        <circle cx="62" cy="48" r="10" fill="none" stroke={eye} strokeWidth="2.5" />
+        <line x1="48" y1="48" x2="52" y2="48" stroke={eye} strokeWidth="2.5" />
+        <path d="M44 58 q6 4 12 0" stroke={eye} strokeWidth="3" fill="none" strokeLinecap="round" />
+      </>)}
+      {type==="max" && (<>
+        <circle cx="38" cy="48" r="6" fill={eye} />
+        <circle cx="62" cy="48" r="6" fill={eye} />
+        <circle cx="40" cy="46" r="2" fill="#FFFFFF" />
+        <circle cx="64" cy="46" r="2" fill="#FFFFFF" />
+        <path d="M42 58 q8 8 16 0" stroke={eye} strokeWidth="3.5" fill="none" strokeLinecap="round" />
+        <path d="M50 6 l-7 14 h6 l-4 12 12 -16 h-6 l5 -10 z" fill="#FFFFFF" />
+      </>)}
+    </svg>
+  );
+}
+function Sparkle({ top, left, size=16, delay=0 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24"
+      style={{ position:"absolute", top, left, animation:`twinkle 2.4s ease-in-out ${delay}s infinite`, pointerEvents:"none" }}>
+      <path d="M12 0 C13 7 17 11 24 12 C17 13 13 17 12 24 C11 17 7 13 0 12 C7 11 11 7 12 0 Z" fill="#FFFFFF" opacity="0.9" />
+    </svg>
+  );
+}
+
+function App() {
+  const [spiritKey, setSpiritKey] = useState("nini");
+  const [mode, setMode] = useState("idiom");
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const spirit = SPIRITS[spiritKey];
+  const cfg = MODES[mode];
+
+  async function castMagic() {
+    const input = text.trim();
+    if (!input || loading) return;
+    if (BACKEND_URL.includes("YOUR-APP")) {
+      setError("還沒設定後端網址喔!請打開 docs/index.html,把 BACKEND_URL 換成你的 Railway 網址。");
+      return;
+    }
+    setLoading(true); setResult(null); setError("");
+    try {
+      const res = await fetch(`${BACKEND_URL}/magic`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ spirit: spiritKey, mode, text: input }),
+      });
+      if (!res.ok) throw new Error("bad");
+      const data = await res.json();
+      setResult(data);
+    } catch (e) {
+      setError("小精靈的魔法棒打了一個盹,再按一次「變身」試試看吧!");
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <div style={S.root}>
+      <div style={{...S.shell}}>
+        <div style={S.tabs}>
+          {Object.values(MODES).map((m) => {
+            const on = m.key === mode;
+            return <button key={m.key} onClick={()=>{setMode(m.key);setResult(null);setError("");}}
+              style={{...S.tab, background:on?"#fff":"transparent", color:on?spirit.deep:"#9A8FA0",
+                boxShadow:on?"0 6px 16px rgba(0,0,0,0.08)":"none"}}>{m.title}</button>;
+          })}
+        </div>
+
+        <div style={{...S.heroCard, background:spirit.soft}}>
+          <Sparkle top={14} left={"18%"} size={14} delay={0} />
+          <Sparkle top={30} left={"82%"} size={18} delay={0.7} />
+          <Sparkle top={86} left={"8%"} size={12} delay={1.3} />
+          <div style={S.heroRow}>
+            <Mascot type={spiritKey} color={spirit.color} size={86} />
+            <div style={{flex:1, minWidth:0}}>
+              <div style={{...S.pill, background:spirit.color}}>你的專屬語文小教練</div>
+              <div style={{...S.heroName, color:spirit.deep}}>現在陪著你的是:{spirit.tag}的【{spirit.name}】</div>
+            </div>
+          </div>
+          <div style={{...S.heroQuote, color:spirit.deep}}>「{spirit.intro}」</div>
+        </div>
+
+        <div style={S.switchRow}>
+          <span style={S.switchLabel}>切換精靈</span>
+          {Object.entries(SPIRITS).map(([k,s]) => {
+            const on = k === spiritKey;
+            return <button key={k} onClick={()=>setSpiritKey(k)}
+              style={{...S.spiritChip, borderColor:on?s.color:"#EADFE6", background:on?s.soft:"#fff",
+                color:on?s.deep:"#9A8FA0", transform:on?"translateY(-2px)":"none"}}>
+              <Mascot type={k} color={s.color} size={26} animate={false} />{s.name}
+            </button>;
+          })}
+        </div>
+
+        <div style={S.blurbCard}>
+          <div style={{...S.blurbTitle, color:spirit.deep}}>{cfg.title}　一鍵字句華麗變身</div>
+          <div style={S.blurbText}>{cfg.blurb}</div>
+        </div>
+
+        <div style={S.inputLabel}>輸入你想升級的普通字句:</div>
+        <textarea value={text} onChange={(e)=>setText(e.target.value)} placeholder={cfg.placeholder}
+          rows={3} style={S.textarea} />
+        <div style={S.exampleRow}>
+          {cfg.examples.map((ex,i)=>(
+            <button key={i} style={S.exChip} onClick={()=>setText(ex)}>
+              {ex.length>12 ? ex.slice(0,12)+"…" : ex}</button>
+          ))}
+        </div>
+
+        <button onClick={castMagic} disabled={loading||!text.trim()}
+          style={{...S.castBtn, background:spirit.color, opacity:(loading||!text.trim())?0.55:1,
+            cursor:(loading||!text.trim())?"default":"pointer"}}>
+          {loading ? "施展魔法中…" : "變身!"}
+        </button>
+
+        {loading && (
+          <div style={S.loadingBox}>
+            <Mascot type={spiritKey} color={spirit.color} size={56} />
+            <div style={S.dots}>
+              <span style={{...S.dot, background:spirit.color}} />
+              <span style={{...S.dot, background:spirit.color, animationDelay:"0.2s"}} />
+              <span style={{...S.dot, background:spirit.color, animationDelay:"0.4s"}} />
+            </div>
+          </div>
+        )}
+
+        {error && <div style={S.errorBox}>{error}</div>}
+
+        {result && !loading && result.ok === false && (
+          <div style={S.resultWrap}>
+            <div style={{...S.cheerCard, background:spirit.soft, color:spirit.deep, marginTop:0}}>
+              <Mascot type={spiritKey} color={spirit.color} size={44} animate={false} />
+              <span>{result.redirect || "我們在成語魔法屋只幫你把句子變漂亮喔!請給我一句你想升級的句子吧!"}</span>
+            </div>
+          </div>
+        )}
+
+        {result && !loading && result.ok !== false && (
+          <div style={S.resultWrap}>
+            <div style={{...S.resultTop, borderColor:spirit.color}}>
+              <div style={{...S.resultTag, color:spirit.deep}}>變身完成</div>
+              <div style={S.upgraded}>{result.upgraded}</div>
+            </div>
+            {Array.isArray(result.items) && result.items.map((it,i)=>(
+              <div key={i} style={{...S.idiomCard, animationDelay:`${i*0.08}s`}}>
+                <div style={{...S.idiomWord, background:spirit.soft, color:spirit.deep}}>{it.word}</div>
+                <div style={S.idiomBody}>
+                  <div><b style={{color:spirit.deep}}>意思:</b>{it.meaning}</div>
+                  {it.why && <div style={{marginTop:4}}><b style={{color:spirit.deep}}>為什麼適合:</b>{it.why}</div>}
+                </div>
+              </div>
+            ))}
+            {result.cheer && (
+              <div style={{...S.cheerCard, background:spirit.soft, color:spirit.deep}}>
+                <Mascot type={spiritKey} color={spirit.color} size={44} animate={false} />
+                <span>{result.cheer}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={S.foot}>WordWand　·　成語魔法屋　·　{VERSION}</div>
+      </div>
+    </div>
+  );
+}
+
+/* 跨平台中文字型 fallback chain（kit 靜態頁示範 5.4） */
+const baseFont = "'Noto Sans TC', system-ui, -apple-system, 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans CJK TC', 'Segoe UI', sans-serif";
+const S = {
+  root:{ fontFamily:baseFont, background:"radial-gradient(120% 120% at 50% 0%, #FFF6EC 0%, #FDEDF3 60%, #F3ECFB 100%)", minHeight:"100vh", padding:"18px 12px 28px", boxSizing:"border-box" },
+  shell:{ maxWidth:460, margin:"0 auto" },
+  tabs:{ display:"flex", gap:6, background:"rgba(255,255,255,0.5)", padding:5, borderRadius:18, marginBottom:16 },
+  tab:{ flex:1, border:"none", borderRadius:14, padding:"10px 8px", fontFamily:baseFont, fontWeight:700, fontSize:15, cursor:"pointer", transition:"all .2s" },
+  heroCard:{ position:"relative", borderRadius:28, padding:"20px 18px", overflow:"hidden", boxShadow:"0 10px 28px rgba(180,120,160,0.16)" },
+  heroRow:{ display:"flex", gap:12, alignItems:"center" },
+  pill:{ display:"inline-block", color:"#fff", fontWeight:700, fontSize:12, padding:"4px 12px", borderRadius:999, marginBottom:6 },
+  heroName:{ fontWeight:900, fontSize:20, lineHeight:1.3 },
+  heroQuote:{ marginTop:14, fontSize:14.5, lineHeight:1.7, fontWeight:500, opacity:0.92 },
+  switchRow:{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", margin:"16px 2px" },
+  switchLabel:{ fontSize:13, color:"#9A8FA0", fontWeight:700 },
+  spiritChip:{ display:"inline-flex", alignItems:"center", gap:6, border:"2.5px solid", borderRadius:999, padding:"6px 14px 6px 8px", fontFamily:baseFont, fontWeight:700, fontSize:14, cursor:"pointer", transition:"all .18s" },
+  blurbCard:{ background:"#fff", borderRadius:22, padding:"16px 18px", boxShadow:"0 6px 18px rgba(150,130,160,0.1)" },
+  blurbTitle:{ fontWeight:900, fontSize:17, marginBottom:8 },
+  blurbText:{ fontSize:14, lineHeight:1.7, color:"#6B5F6E" },
+  inputLabel:{ margin:"18px 4px 8px", fontSize:14, fontWeight:700, color:"#6B5F6E" },
+  textarea:{ width:"100%", boxSizing:"border-box", border:"2.5px solid #F0E4EE", borderRadius:18, padding:"14px 16px", fontFamily:baseFont, fontSize:16, lineHeight:1.6, resize:"vertical", outline:"none", background:"#fff", color:"#3A2E3F" },
+  exampleRow:{ display:"flex", gap:8, flexWrap:"wrap", margin:"10px 2px 0" },
+  exChip:{ border:"2px dashed #E3D3DE", background:"#fff", borderRadius:999, padding:"6px 12px", fontFamily:baseFont, fontSize:12.5, color:"#8A7C8C", cursor:"pointer" },
+  castBtn:{ width:"100%", marginTop:16, border:"none", borderRadius:20, padding:"16px", color:"#fff", fontFamily:baseFont, fontWeight:900, fontSize:18, letterSpacing:2, boxShadow:"0 10px 22px rgba(160,110,140,0.28)" },
+  loadingBox:{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, padding:"22px 0 6px" },
+  dots:{ display:"flex", gap:8 },
+  dot:{ width:11, height:11, borderRadius:999, display:"inline-block", animation:"dotjump 1s ease-in-out infinite" },
+  errorBox:{ marginTop:16, background:"#FFF0E8", border:"2px solid #FFD3B6", borderRadius:16, padding:"14px 16px", color:"#B5651D", fontSize:14, lineHeight:1.6, textAlign:"center", fontWeight:600 },
+  resultWrap:{ marginTop:18 },
+  resultTop:{ background:"#fff", borderRadius:22, padding:"16px 18px", border:"2.5px solid", boxShadow:"0 8px 22px rgba(150,120,160,0.14)", animation:"rise .4s ease both" },
+  resultTag:{ fontWeight:900, fontSize:13, letterSpacing:1, marginBottom:6 },
+  upgraded:{ fontSize:18, lineHeight:1.8, fontWeight:700, color:"#3A2E3F" },
+  idiomCard:{ display:"flex", gap:12, background:"#fff", borderRadius:18, padding:"14px 16px", marginTop:12, boxShadow:"0 5px 14px rgba(150,130,160,0.1)", animation:"rise .4s ease both" },
+  idiomWord:{ flexShrink:0, alignSelf:"flex-start", fontWeight:900, fontSize:16, padding:"8px 12px", borderRadius:14, minWidth:56, textAlign:"center" },
+  idiomBody:{ fontSize:14, lineHeight:1.7, color:"#5E5263" },
+  cheerCard:{ display:"flex", alignItems:"center", gap:10, borderRadius:20, padding:"14px 16px", marginTop:14, fontSize:15, fontWeight:700, lineHeight:1.6, animation:"rise .4s ease both" },
+  foot:{ textAlign:"center", marginTop:22, fontSize:12, color:"#B6A8B8", fontWeight:600, letterSpacing:1 },
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# 雲端部署依賴一律精確鎖版（kit 坑 #46：浮動版本 + 自動 rebuild = 隨機破壞）
+fastapi==0.115.6
+starlette==0.41.3
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+pydantic==2.10.4
