@@ -10,7 +10,7 @@ WordWand (成語魔法屋) - 後端代理 (FastAPI)
 由模型在 JSON 回傳 "ok" 旗標判定：ok=true 才改寫，ok=false 回 redirect 引導語。
 """
 
-VERSION = "V0.2.2"
+VERSION = "V0.2.3"
 
 import os
 import json

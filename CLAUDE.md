@@ -16,8 +16,8 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.2.2
-- **狀態:** 可運作(前端 + 後端皆完成,兒童安全把關已上,待實際部署填入 BACKEND_URL)
+- **版本:** V0.2.3
+- **狀態:** 已上線(後端 Railway 運作中、前端已接入正式網址;待把 CORS 收斂)
 - **一句話定位:** 給國小學生的 AI 寫作小幫手——把普通句子變成含成語/感官描寫的句子,三精靈不同語氣;英文品牌名 WordWand,中文功能名成語魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
 - **入口點:** 前端 `docs/index.html` 的 `App()`;後端 `main.py`(repo 根目錄)的 `app`(`POST /magic`)
@@ -135,12 +135,13 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.2.0 | 取英文品牌名 WordWand;加兒童安全把關(範圍鎖定只做作文 + 內容把關 G 級,後端 ok 旗標 + fail-safe) |
 | V0.2.1 | 配色微調:SELA 指定改為輕爽天藍 + 粉色系(尼尼粉 / 奇奇天藍 / 麥克斯薰衣草藍紫),背景天藍漸層、theme-color/favicon 同步 |
 | V0.2.2 | 部署結構修正:後端三檔從 backend/ 移到 repo 根目錄(解 Railway 子目錄 build 失敗,坑 #1);前端維持 docs/ |
+| V0.2.3 | 後端部署成功(Railway),前端 BACKEND_URL 接入正式網址 wordwand-production-2a37.up.railway.app |
 
 ---
 
 ## 七、下版候選工作(按優先序)
 
-1. **實際部署並把 BACKEND_URL / CORS 收斂** — 第 1 名:沒部署等於沒上線,且 CORS 開 `*` 會讓 key 被任意網站借用,屬安全前置。
+1. **把後端 CORS 從 `*` 收斂到自己的 GitHub Pages 網址** — 第 1 名:後端已上線且 CORS 全開,任何網站都能借用你的 key 呼叫,屬安全前置(填入 Pages 網址即可)。
 2. 後端加簡單速率限制(防同一 IP 短時間大量呼叫,保護 API 額度;對兒童公開服務尤其重要)。
 3. 結果加「複製給老師看」按鈕(把改寫結果一鍵複製成純文字)。
 4. 第三個分頁「開頭結尾魔法」(教轉場/開頭句)。
@@ -166,4 +167,4 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 
 ## 九、一句話總結
 
-V0.2.2:把後端三檔移到 repo 根目錄,解掉 Railway 子目錄 build 失敗(坑 #1);前面 V0.2.1 配色已是天藍+粉、V0.2.0 已有兒童安全兩道防線與品牌名 WordWand;架構仍是「GitHub Pages 靜態前端(docs/) + Railway 代理藏 key(根目錄)」、不套品牌 logo;下版第一優先是部署成功後把 BACKEND_URL 填上、CORS 收斂到自己的網址。
+V0.2.3:後端已成功部署在 Railway、前端接入正式網址,全線打通;前面 V0.2.2 解掉子目錄 build 坑、V0.2.1 配色天藍+粉、V0.2.0 兒童安全雙閘 + 品牌名 WordWand;下版第一優先是把後端 CORS 從 `*` 收斂到自己的 GitHub Pages 網址。
