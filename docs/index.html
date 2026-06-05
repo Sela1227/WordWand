@@ -34,7 +34,7 @@
 <script type="text/babel">
 const { useState } = React;
 
-const VERSION = "V0.3.1";
+const VERSION = "V0.4.0";
 
 /* ====================================================================== */
 /*  ★★★ 唯一需要你修改的地方:把下面換成你的 Railway 後端網址 ★★★         */
@@ -61,6 +61,16 @@ const MODES = {
     blurb:"好的描寫會用到眼睛、耳朵、鼻子、嘴巴和皮膚。把句子放進來,小精靈會幫你加上生動的感官描寫!",
     placeholder:"我走進了廚房。",
     examples:["我走進了廚房。","外面開始下雨了。","媽媽煮了一鍋湯。"] },
+  gym:   { key:"gym", title:"句子健身房",
+    blurb:"把你寫的句子放進來,小精靈像教練一樣,告訴你哪裡可以練得更強壯、還有怎麼改,讓你自己越寫越棒!",
+    placeholder:"我今天去公園玩,很開心。",
+    examples:["我今天去公園玩,很開心。","那隻狗很大很大。","我吃了飯然後去睡覺。"],
+    resultHint:"教練幫你看看可以更強的地方:" },
+  grow:  { key:"grow", title:"句子長大屋",
+    blurb:"只寫了一句話,不知道怎麼變多嗎?把句子放進來,小精靈會問你幾個問題,跟著想一想,一句話就會長成一段!",
+    placeholder:"今天我去了動物園。",
+    examples:["今天我去了動物園。","昨天下雨了。","我有一個好朋友。"],
+    resultHint:"跟著這幾個問題想一想,再自己寫寫看:" },
 };
 
 function Mascot({ type, color, size=72, animate=true }) {
@@ -225,10 +235,15 @@ function App() {
 
         {result && !loading && result.ok !== false && (
           <div style={S.resultWrap}>
-            <div style={{...S.resultTop, borderColor:spirit.color}}>
-              <div style={{...S.resultTag, color:spirit.deep}}>變身完成</div>
-              <div style={S.upgraded}>{result.upgraded}</div>
-            </div>
+            {result.upgraded && (
+              <div style={{...S.resultTop, borderColor:spirit.color}}>
+                <div style={{...S.resultTag, color:spirit.deep}}>變身完成</div>
+                <div style={S.upgraded}>{result.upgraded}</div>
+              </div>
+            )}
+            {!result.upgraded && cfg.resultHint && (
+              <div style={{...S.hintLine, color:spirit.deep}}>{cfg.resultHint}</div>
+            )}
             {Array.isArray(result.items) && result.items.map((it,i)=>(
               <div key={i} style={{...S.idiomCard, animationDelay:`${i*0.08}s`}}>
                 <div style={{...S.idiomWord, background:spirit.soft, color:spirit.deep}}>{it.word}</div>
@@ -236,6 +251,12 @@ function App() {
                   <div><b style={{color:spirit.deep}}>意思:</b>{it.meaning}</div>
                   {it.why && <div style={{marginTop:4}}><b style={{color:spirit.deep}}>為什麼適合:</b>{it.why}</div>}
                 </div>
+              </div>
+            ))}
+            {Array.isArray(result.questions) && result.questions.map((q,i)=>(
+              <div key={i} style={{...S.qCard, animationDelay:`${i*0.08}s`}}>
+                <div style={{...S.qNum, background:spirit.soft, color:spirit.deep}}>{i+1}</div>
+                <div style={S.qText}>{q}</div>
               </div>
             ))}
             {result.cheer && (
@@ -258,8 +279,8 @@ const baseFont = "'Noto Sans TC', system-ui, -apple-system, 'Microsoft JhengHei'
 const S = {
   root:{ fontFamily:baseFont, background:"radial-gradient(120% 120% at 50% 0%, #E6F5FF 0%, #F1FAFF 38%, #FFEFF6 100%)", minHeight:"100vh", padding:"calc(18px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))", boxSizing:"border-box" },
   shell:{ maxWidth:460, margin:"0 auto" },
-  tabs:{ display:"flex", gap:6, background:"rgba(255,255,255,0.5)", padding:5, borderRadius:18, marginBottom:16 },
-  tab:{ flex:1, border:"none", borderRadius:14, padding:"10px 8px", fontFamily:baseFont, fontWeight:700, fontSize:15, cursor:"pointer", transition:"all .2s" },
+  tabs:{ display:"flex", flexWrap:"wrap", gap:6, background:"rgba(255,255,255,0.5)", padding:5, borderRadius:18, marginBottom:16 },
+  tab:{ flex:"1 1 calc(50% - 3px)", border:"none", borderRadius:14, padding:"11px 8px", fontFamily:baseFont, fontWeight:700, fontSize:15, cursor:"pointer", transition:"all .2s" },
   heroCard:{ position:"relative", borderRadius:28, padding:"20px 18px", overflow:"hidden", boxShadow:"0 10px 28px rgba(180,120,160,0.16)" },
   heroRow:{ display:"flex", gap:12, alignItems:"center" },
   pill:{ display:"inline-block", color:"#fff", fontWeight:700, fontSize:12, padding:"4px 12px", borderRadius:999, marginBottom:6 },
@@ -283,6 +304,10 @@ const S = {
   resultWrap:{ marginTop:18 },
   resultTop:{ background:"#fff", borderRadius:22, padding:"16px 18px", border:"2.5px solid", boxShadow:"0 8px 22px rgba(150,120,160,0.14)", animation:"rise .4s ease both" },
   resultTag:{ fontWeight:900, fontSize:13, letterSpacing:1, marginBottom:6 },
+  hintLine:{ fontWeight:800, fontSize:15, margin:"2px 4px 4px", lineHeight:1.5 },
+  qCard:{ display:"flex", gap:12, alignItems:"flex-start", background:"#fff", borderRadius:18, padding:"14px 16px", marginTop:12, boxShadow:"0 5px 14px rgba(150,130,160,0.1)", animation:"rise .4s ease both" },
+  qNum:{ flexShrink:0, width:30, height:30, borderRadius:999, fontWeight:900, fontSize:15, display:"flex", alignItems:"center", justifyContent:"center" },
+  qText:{ fontSize:15.5, lineHeight:1.7, color:"#5E5263", paddingTop:3 },
   upgraded:{ fontSize:18, lineHeight:1.8, fontWeight:700, color:"#3A2E3F" },
   idiomCard:{ display:"flex", gap:12, background:"#fff", borderRadius:18, padding:"14px 16px", marginTop:12, boxShadow:"0 5px 14px rgba(150,130,160,0.1)", animation:"rise .4s ease both" },
   idiomWord:{ flexShrink:0, alignSelf:"flex-start", fontWeight:900, fontSize:16, padding:"8px 12px", borderRadius:14, minWidth:56, textAlign:"center" },
