@@ -1,7 +1,7 @@
 {
-  "name": "WordWand 成語魔法屋",
+  "name": "WordWand 作文魔法屋",
   "short_name": "WordWand",
-  "description": "陪小朋友把普通句子變成漂亮成語的寫作小幫手",
+  "description": "陪國小學生練習作文的 AI 小幫手:成語、感官、修句、擴寫、靈感、大綱",
   "icons": [
     { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
   ],

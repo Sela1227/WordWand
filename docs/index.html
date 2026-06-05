@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>WordWand 成語魔法屋</title>
+<title>WordWand 作文魔法屋</title>
 <!-- 自訂 favicon（本專案不套 SELA logo，使用專屬可愛標記）。相對路徑：GitHub Pages 子路徑安全（坑 #39） -->
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="manifest" href="site.webmanifest" />
@@ -34,7 +34,7 @@
 <script type="text/babel">
 const { useState } = React;
 
-const VERSION = "V0.4.0";
+const VERSION = "V0.5.0";
 
 /* ====================================================================== */
 /*  ★★★ 唯一需要你修改的地方:把下面換成你的 Railway 後端網址 ★★★         */
@@ -53,24 +53,39 @@ const SPIRITS = {
     intro:"麥克斯超有活力!我們一起把無聊的句子,變成超酷的成語魔法吧!" },
 };
 const MODES = {
-  idiom: { key:"idiom", title:"成語魔法屋",
+  idiom: { key:"idiom", title:"成語變身術", btn:"變身!", inputLabel:"輸入你想練習的句子:",
     blurb:"你常常寫「很生氣」、「哭得很慘」、「天氣很漂亮」嗎?把句子放進來,小精靈會幫你找出好用的成語!",
     placeholder:"我今天考了一百分,心裡非常高興。",
+    itemLabels:{meaning:"意思",why:"為什麼適合"},
     examples:["我今天考了一百分,心裡非常高興。","弟弟把房間弄得很亂。","今天的夕陽真的好漂亮。"] },
-  senses:{ key:"senses", title:"五官寫作屋",
+  senses:{ key:"senses", title:"五感放大鏡", btn:"變身!", inputLabel:"輸入你想練習的句子:",
     blurb:"好的描寫會用到眼睛、耳朵、鼻子、嘴巴和皮膚。把句子放進來,小精靈會幫你加上生動的感官描寫!",
     placeholder:"我走進了廚房。",
+    itemLabels:{meaning:"描寫",why:"好處"},
     examples:["我走進了廚房。","外面開始下雨了。","媽媽煮了一鍋湯。"] },
-  gym:   { key:"gym", title:"句子健身房",
+  gym:   { key:"gym", title:"句子健身房", btn:"幫我看看!", inputLabel:"輸入你想練習的句子:",
     blurb:"把你寫的句子放進來,小精靈像教練一樣,告訴你哪裡可以練得更強壯、還有怎麼改,讓你自己越寫越棒!",
     placeholder:"我今天去公園玩,很開心。",
-    examples:["我今天去公園玩,很開心。","那隻狗很大很大。","我吃了飯然後去睡覺。"],
-    resultHint:"教練幫你看看可以更強的地方:" },
-  grow:  { key:"grow", title:"句子長大屋",
+    itemLabels:{meaning:"說明",why:"怎麼改"},
+    resultHint:"教練幫你看看可以更強的地方:",
+    examples:["我今天去公園玩,很開心。","那隻狗很大很大。","我吃了飯然後去睡覺。"] },
+  grow:  { key:"grow", title:"句子長大樹", btn:"讓它長大!", inputLabel:"輸入一句話,讓它長大:",
     blurb:"只寫了一句話,不知道怎麼變多嗎?把句子放進來,小精靈會問你幾個問題,跟著想一想,一句話就會長成一段!",
     placeholder:"今天我去了動物園。",
-    examples:["今天我去了動物園。","昨天下雨了。","我有一個好朋友。"],
-    resultHint:"跟著這幾個問題想一想,再自己寫寫看:" },
+    resultHint:"跟著這幾個問題想一想,再自己寫寫看:",
+    examples:["今天我去了動物園。","昨天下雨了。","我有一個好朋友。"] },
+  ideas: { key:"ideas", title:"靈感泡泡", btn:"給我點子!", inputLabel:"輸入一個主題詞:",
+    blurb:"不知道要寫什麼嗎?給小精靈一個主題,它會吹出好多靈感泡泡,從不同角度幫你打開思路!",
+    placeholder:"下雨天",
+    itemLabels:{meaning:"想想看"},
+    resultHint:"這些靈感泡泡,挑你喜歡的寫進去:",
+    examples:["下雨天","我的好朋友","我最喜歡的食物"] },
+  outline:{ key:"outline", title:"作文藏寶圖", btn:"畫藏寶圖!", inputLabel:"輸入你的作文題目:",
+    blurb:"拿到題目不知道怎麼開始嗎?把題目給小精靈,它會幫你畫一張藏寶圖,告訴你開頭、經過、結尾各寫什麼!",
+    placeholder:"我最難忘的一天",
+    itemLabels:{meaning:"可以寫什麼"},
+    resultHint:"照著這張藏寶圖,一段一段自己寫:",
+    examples:["我最難忘的一天","我的家人","一次失敗的經驗"] },
 };
 
 function Mascot({ type, color, size=72, animate=true }) {
@@ -191,11 +206,11 @@ function App() {
         </div>
 
         <div style={S.blurbCard}>
-          <div style={{...S.blurbTitle, color:spirit.deep}}>{cfg.title}　一鍵字句華麗變身</div>
+          <div style={{...S.blurbTitle, color:spirit.deep}}>{cfg.title}</div>
           <div style={S.blurbText}>{cfg.blurb}</div>
         </div>
 
-        <div style={S.inputLabel}>輸入你想升級的普通字句:</div>
+        <div style={S.inputLabel}>{cfg.inputLabel || "輸入你想練習的句子:"}</div>
         <textarea value={text} onChange={(e)=>setText(e.target.value)} placeholder={cfg.placeholder}
           rows={3} style={S.textarea} />
         <div style={S.exampleRow}>
@@ -208,7 +223,7 @@ function App() {
         <button onClick={castMagic} disabled={loading||!text.trim()}
           style={{...S.castBtn, background:spirit.color, opacity:(loading||!text.trim())?0.55:1,
             cursor:(loading||!text.trim())?"default":"pointer"}}>
-          {loading ? "施展魔法中…" : "變身!"}
+          {loading ? "施展魔法中…" : (cfg.btn || "變身!")}
         </button>
 
         {loading && (
@@ -228,7 +243,7 @@ function App() {
           <div style={S.resultWrap}>
             <div style={{...S.cheerCard, background:spirit.soft, color:spirit.deep, marginTop:0}}>
               <Mascot type={spiritKey} color={spirit.color} size={44} animate={false} />
-              <span>{result.redirect || "我們在成語魔法屋只幫你把句子變漂亮喔!請給我一句你想升級的句子吧!"}</span>
+              <span>{result.redirect || "我們在作文魔法屋只幫你做寫作練習喔!請給我一句你想練習的句子吧!"}</span>
             </div>
           </div>
         )}
@@ -248,8 +263,8 @@ function App() {
               <div key={i} style={{...S.idiomCard, animationDelay:`${i*0.08}s`}}>
                 <div style={{...S.idiomWord, background:spirit.soft, color:spirit.deep}}>{it.word}</div>
                 <div style={S.idiomBody}>
-                  <div><b style={{color:spirit.deep}}>意思:</b>{it.meaning}</div>
-                  {it.why && <div style={{marginTop:4}}><b style={{color:spirit.deep}}>為什麼適合:</b>{it.why}</div>}
+                  <div><b style={{color:spirit.deep}}>{(cfg.itemLabels&&cfg.itemLabels.meaning)||"說明"}:</b>{it.meaning}</div>
+                  {it.why && <div style={{marginTop:4}}><b style={{color:spirit.deep}}>{(cfg.itemLabels&&cfg.itemLabels.why)||"提示"}:</b>{it.why}</div>}
                 </div>
               </div>
             ))}
@@ -268,7 +283,7 @@ function App() {
           </div>
         )}
 
-        <div style={S.foot}>WordWand　·　成語魔法屋　·　{VERSION}</div>
+        <div style={S.foot}>WordWand　·　作文魔法屋　·　{VERSION}</div>
       </div>
     </div>
   );

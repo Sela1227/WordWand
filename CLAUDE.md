@@ -1,4 +1,4 @@
-# CLAUDE.md — WordWand（成語魔法屋）
+# CLAUDE.md — WordWand（作文魔法屋）
 
 > **這份是給下次 Claude 看的工作上下文,不是文件。**
 > 維護章法見 `SELA-Starter-Kit/conventions/CLAUDE-MD-章法.md`,每次升版前複習。
@@ -16,9 +16,9 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.4.0
+- **版本:** V0.5.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
-- **一句話定位:** 給國小學生的 AI 寫作小幫手——把普通句子變成含成語/感官描寫的句子,三精靈不同語氣;英文品牌名 WordWand,中文功能名成語魔法屋。
+- **一句話定位:** 給國小學生的 AI 寫作小幫手——把普通句子變成含成語/感官描寫的句子,三精靈不同語氣;英文品牌名 WordWand,中文名作文魔法屋(六種寫作練習模式)。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
 - **入口點:** 前端 `docs/index.html` 的 `App()`;後端 `main.py`(repo 根目錄)的 `app`(`POST /magic`)
 
@@ -50,8 +50,8 @@
 | 後端網址(部署必改) | `docs/index.html` 開頭 `BACKEND_URL` |
 | 精靈外觀(名稱/配色/介紹) | `docs/index.html` 的 `SPIRITS` 物件 |
 | 精靈人格語氣 | `main.py` 的 `PERSONAS`(改這裡才會變語氣,前端只是顯示) |
-| 模式(成語/五官/健身房/長大屋)說明與範例 | `docs/index.html` 的 `MODES` |
-| AI 任務指令 / 回傳格式(四模式) | `main.py` 的 `TASKS` / `SCHEMA_OK` |
+| 六模式說明/範例/按鈕/欄位標籤 | `docs/index.html` 的 `MODES`(每模式含 title/btn/inputLabel/itemLabels/resultHint) |
+| AI 任務指令 / 回傳格式(六模式) | `main.py` 的 `TASKS` / `SCHEMA_OK` |
 | 兒童安全規則(範圍鎖定 + 內容把關) | `main.py` 的 `SAFETY` 常數(放 prompt 最前面,最優先) |
 | ok=false 引導畫面 | `docs/index.html` 結果區「result.ok === false」分支 |
 | 模型、單句長度上限 | `main.py` 的 `MODEL` / `len(text) > 200` |
@@ -61,8 +61,10 @@
 
 > **契約提醒:** 前端送 `{spirit, mode, text}`;後端依 mode 回不同形狀(都含 `ok`):
 > - idiom/senses → `{ok:true, upgraded, items[], cheer}`
-> - gym(健身房)→ `{ok:true, items[], cheer}`(無 upgraded,items 是「可改進點 + 怎麼改」)
-> - grow(長大屋)→ `{ok:true, questions[], cheer}`(引導問題字串陣列)
+> - gym(健身房)→ `{ok:true, items[], cheer}`(items=「可改進點+說明+怎麼改」)
+> - grow(長大樹)→ `{ok:true, questions[], cheer}`(引導問題字串陣列)
+> - ideas(靈感泡泡)→ `{ok:true, items[], cheer}`(items=「角度標籤+提示」,無 why)
+> - outline(藏寶圖)→ `{ok:true, items[], cheer}`(items=開頭/經過/結尾 三段引導)
 > - 任一不通過 → `{ok:false, redirect}`
 > 前端依 `ok` 分流,再依 `upgraded` / `items` / `questions` 是否存在渲染。改欄位名兩邊要同改。
 
@@ -146,6 +148,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.3.0 | 安全收尾:CORS 收斂到 https://sela1227.github.io、加每 IP 速率限制(20 次/分,記憶體版) |
 | V0.3.1 | 手機優化:消除點擊延遲/灰色高亮、補瀏海+底部安全區、點按回饋、放大範例小卡觸控範圍、防橫向溢出 |
 | V0.4.0 | 加兩個訓練作文能力的模式:句子健身房(指弱點+教怎麼改,不代寫)、句子長大屋(引導問題擴寫,不代寫);分頁改 2x2;結果渲染支援 items/questions 不同形狀 |
+| V0.5.0 | 更名作文魔法屋;模式名稱全面變化(成語變身術/五感放大鏡/句子健身房/句子長大樹);新增靈感泡泡(主題→多角度點子)、作文藏寶圖(題目→三段大綱);item 欄位標籤改各模式自訂(修正健身房等標籤語意);按鈕/輸入提示各模式自訂 |
 
 ---
 
@@ -153,17 +156,22 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 
 > 設計原則(訓練作文能力):優先做「教學/鷹架型」功能(引導、提示、講原因),少做「代寫型」功能,否則只是給答案、訓練不到能力,也可能變成代寫工具。句子健身房/長大屋(V0.4.0)是此原則的落地。
 
-1. **點子產生器 / 主題聯想** — 第 1 名:寫作最難是「沒得寫」,給主題詞丟感官與角度提示幫發想,補上「動筆前」這一段。
-2. **作文題目 + 大綱引導** — 給適齡題目,協助列開頭-經過-結尾三段大綱(練結構)。
-3. **修辭魔法** — 教譬喻/擬人/排比,把白句加上一個比喻並解釋。
-4. 結果加「複製給老師看」按鈕(一鍵複製純文字)。
-5. 成語寶庫(集點):把學過的成語收集起來,localStorage 存(GitHub Pages 可用),練動機。
-6. 把精靈人格、四模式、SAFETY 抽成 `config.json`,改規則不用動程式。
-7. 速率限制未來升跨 replica 版。
+1. **結果加「複製給老師看」按鈕** — 第 1 名:六模式都產文字,小朋友/老師最常見下一步是複製出去,CP 值最高。
+2. **修辭魔法** — 教譬喻/擬人/排比,把白句加上一個比喻並解釋(再進階一階的表達力)。
+3. **成語寶庫(集點)** — 把學過的成語收集成冊,localStorage 存,練動機。
+4. 把精靈人格、六模式 TASKS/SCHEMA、SAFETY 抽成 `config.json`,改規則不用動程式(模式變多後維護成本上升,值得做)。
+5. 速率限制未來升跨 replica 版。
+6. 模式變多,考慮把分頁改成可橫向滑動或分組,避免 2x3 佔太高。
 
 ---
 
 ## 八、升版必讀(如有)
+
+### V0.5.0 模式擴充(維護重點)
+
+- 現有六模式:idiom / senses / gym / grow / ideas / outline。**新增模式要同步改三處**:後端 `TASKS` + `SCHEMA_OK`、前端 `MODES`。漏一處就會壞(後端少了 → 400 參數錯誤;前端少了 → tab 不出現)。
+- item 欄位標籤已改成 `MODES[mode].itemLabels` 驅動,不再寫死「意思/為什麼適合」。新模式若用 items,記得設 itemLabels。
+- 回傳形狀有三種(upgraded / items / questions),前端依欄位是否存在渲染;新模式挑一種沿用即可。
 
 ### V0.3.0 安全收尾(注意事項)
 
@@ -186,4 +194,4 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 
 ## 九、一句話總結
 
-V0.4.0:加了兩個訓練作文能力的教學型模式——句子健身房(指出可以更強的地方並教怎麼改)、句子長大屋(用引導問題陪小朋友自己擴寫),兩者都刻意不代寫;分頁改 2x2、結果渲染支援不同回傳形狀。下版第一優先是『點子產生器』,補上『動筆前想不到題材』這一段。
+V0.5.0:更名『作文魔法屋』,模式名稱全面換出變化,並補上『靈感泡泡』(主題→多角度點子)與『作文藏寶圖』(題目→三段大綱),至此六模式覆蓋『想點子→列大綱→寫句子→改句子→擴成段』整條作文流程,且四個新模式都刻意不代寫;下版第一優先是結果加『複製給老師看』按鈕。
