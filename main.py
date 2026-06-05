@@ -11,7 +11,7 @@ WordWand (作文魔法屋) - 後端代理 (FastAPI)
   4. 速率限制：同一 IP 每分鐘上限，保護 API 額度（V0.3.0，記憶體版，單一 replica 有效）。
 """
 
-VERSION = "V0.5.2"
+VERSION = "V0.6.0"
 
 import os
 import json
@@ -39,6 +39,7 @@ app.add_middleware(
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 MODEL = "claude-haiku-4-5-20251001"   # 便宜又快，足夠改寫用；要更強可換 claude-sonnet-4-6
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 # --- 速率限制（記憶體版滑動視窗；單一 replica 有效，hobby 規模夠用） ---
 RATE_LIMIT_MAX = 20      # 每個 IP 在視窗內最多次數
@@ -117,6 +118,11 @@ class MagicRequest(BaseModel):
     text: str
 
 
+class ImageRequest(BaseModel):
+    image_base64: str
+    media_type: str = "image/jpeg"
+
+
 @app.get("/")
 def health():
     return {"status": "ok", "service": "wordwand", "version": VERSION}
@@ -175,3 +181,44 @@ async def magic(req: MagicRequest, request: Request):
         redirect = data.get("redirect") if isinstance(data, dict) else fallback
         return {"ok": False, "redirect": redirect or fallback}
     return data
+
+
+@app.post("/read-image")
+async def read_image(req: ImageRequest, request: Request):
+    """拍照輸入：用 Claude 看圖，只讀出照片裡的中文字（不描述圖片、不認人）。
+    讀出的文字會回前端讓小朋友檢查、修改後，再走 /magic 的安全把關。"""
+    if _rate_limited(_client_ip(request)):
+        raise HTTPException(429, "小精靈有點忙，休息一下下，等幾秒再試一次喔！")
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(500, "伺服器尚未設定 ANTHROPIC_API_KEY")
+    if req.media_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(400, "這種照片格式看不懂，用 JPG 或 PNG 拍一張吧！")
+    if not req.image_base64 or len(req.image_base64) > 8_000_000:  # 約 6MB 圖片
+        raise HTTPException(400, "照片太大或是空的，換一張小一點的吧！")
+
+    instruction = (
+        "這是國小學生的作文或作業照片。請只『原樣讀出』照片裡的中文文字，直接輸出文字本身，"
+        "不要翻譯、不要修改、不要加任何說明或標點以外的符號、不要描述圖片內容、不要描述或辨認裡面的人。"
+        "若照片沒有可讀的中文文字，只回傳空字串。"
+    )
+    async with httpx.AsyncClient(timeout=40) as client:
+        r = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": MODEL,
+                "max_tokens": 600,
+                "messages": [{"role": "user", "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": req.media_type, "data": req.image_base64}},
+                    {"type": "text", "text": instruction},
+                ]}],
+            },
+        )
+    if r.status_code != 200:
+        raise HTTPException(502, "照片讀取服務暫時無法回應")
+    text = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text").strip()
+    return {"text": text}

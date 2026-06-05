@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.5.2
+- **版本:** V0.6.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** 給國小學生的 AI 寫作小幫手——把普通句子變成含成語/感官描寫的句子,三精靈不同語氣;英文品牌名 WordWand,中文名作文魔法屋(六種寫作練習模式)。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -54,6 +54,8 @@
 | AI 任務指令 / 回傳格式(六模式) | `main.py` 的 `TASKS` / `SCHEMA_OK` |
 | 兒童安全規則(範圍鎖定 + 內容把關) | `main.py` 的 `SAFETY` 常數(放 prompt 最前面,最優先) |
 | ok=false 引導畫面 | `docs/index.html` 結果區「result.ok === false」分支 |
+| 語音輸入 | `docs/index.html` 的 `toggleVoice`(瀏覽器 Web Speech API,zh-TW) |
+| 拍照輸入 | 前端 `onPhoto` / 後端 `main.py` 的 `/read-image`(Claude 看圖 OCR) |
 | 模型、單句長度上限 | `main.py` 的 `MODEL` / `len(text) > 200` |
 | 允許的前端來源(CORS) | `main.py` 的 `ALLOWED_ORIGINS` |
 | 速率限制次數/視窗 | `main.py` 的 `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW` |
@@ -67,6 +69,8 @@
 > - outline(藏寶圖)→ `{ok:true, items[], cheer}`(items=開頭/經過/結尾 三段引導)
 > - 任一不通過 → `{ok:false, redirect}`
 > 前端依 `ok` 分流,再依 `upgraded` / `items` / `questions` 是否存在渲染。改欄位名兩邊要同改。
+>
+> 另有端點 `POST /read-image`(拍照輸入):送 `{image_base64, media_type}`,回 `{text}`(只 OCR 中文字,不描述圖片)。讀出的文字回前端讓小朋友檢查、修改後再走 `/magic` 的安全把關。
 
 ---
 
@@ -108,6 +112,12 @@ P4. (種子,坑 #13/SW)前端跨域呼叫第三方被擋
    - 原因:後端原本在 `backend/`,但 Railway 預設從 repo 根目錄分析;根目錄只有資料夾沒有 `requirements.txt`,認不出是 Python
    - 做法:兩條路擇一——(A) Railway 服務 Settings → Build → Root Directory 設 `backend`;(B) 直接把後端檔放 repo 根目錄。本專案 V0.2.2 採 (B),最省事、免設定
    - 通用性:任何 monorepo / 多資料夾 repo 部署到 Railway 都會遇到
+
+2. **Web Speech API(語音辨識)在 iOS Safari 支援不穩**
+   - 症狀:`webkitSpeechRecognition` 物件存在(偵測會通過),但 iPhone/iPad 上常常按了沒反應或辨識失敗
+   - 原因:Safari 對 Web Speech API 的支援長期不完整、且各 iOS 版本行為不一
+   - 做法:只用 `!!SR` 偵測「存在才顯示麥克風鈕」+ 完整 onerror 處理(權限/辨識失敗給友善提示);**不要假設顯示了就一定能用**。iOS 為主的族群,拍照輸入(走後端 vision)比語音可靠
+   - 通用性:任何想用瀏覽器語音輸入的 web 專案
 
 ---
 
@@ -151,6 +161,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.5.0 | 更名作文魔法屋;模式名稱全面變化;新增靈感泡泡、作文藏寶圖;item 欄位標籤/按鈕/輸入提示各模式自訂 |
 | V0.5.1 | 分頁依作文流程重排(靈感→大綱→健身房→長大樹→成語→五感,代寫類放後)、預設開靈感泡泡;修正每個模式 placeholder 與第一顆範例重覆 |
 | V0.5.2 | 「句子長大樹」改名「魔法長大樹」(原本與句子健身房都以『句子』開頭,略重覆) |
+| V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 
 ---
 
@@ -158,16 +169,21 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 
 > 設計原則(訓練作文能力):優先做「教學/鷹架型」功能(引導、提示、講原因),少做「代寫型」功能,否則只是給答案、訓練不到能力,也可能變成代寫工具。句子健身房/長大屋(V0.4.0)是此原則的落地。
 
-1. **結果加「複製給老師看」按鈕** — 第 1 名:六模式都產文字,小朋友/老師最常見下一步是複製出去,CP 值最高。
-2. **修辭魔法** — 教譬喻/擬人/排比,把白句加上一個比喻並解釋(再進階一階的表達力)。
-3. **成語寶庫(集點)** — 把學過的成語收集成冊,localStorage 存,練動機。
-4. 把精靈人格、六模式 TASKS/SCHEMA、SAFETY 抽成 `config.json`,改規則不用動程式(模式變多後維護成本上升,值得做)。
-5. 速率限制未來升跨 replica 版。
-6. 模式變多,考慮把分頁改成可橫向滑動或分組,避免 2x3 佔太高。
+1. **結果加「複製給老師看」+「念給你聽」** — 第 1 名:六模式都產文字,複製出去最常用;念出來(瀏覽器語音合成,免費、iOS 也支援)對讀字慢的小朋友很有感,兩個一起做。
+2. **主題快捷選單** — 靈感泡泡/藏寶圖的輸入是一個詞,給一排常見主題鈕用點的不用打(輸入再省力,延續 V0.6.0 方向)。
+3. **修辭魔法** — 教譬喻/擬人/排比(再進階一階的表達力)。
+4. **成語寶庫(集點)** — 把學過的成語收集成冊,localStorage 存,練動機。
+5. 把精靈人格、六模式 TASKS/SCHEMA、SAFETY 抽成 `config.json`。
+6. 速率限制升跨 replica 版;模式變多考慮分頁可橫向滑動。
 
 ---
 
 ## 八、升版必讀(如有)
+
+### V0.6.0 省力輸入(維護重點)
+
+- 語音:`toggleVoice` 用 `window.SpeechRecognition || webkitSpeechRecognition`,`!!SR` 偵測才顯示麥克風鈕(見坑 #2,iOS 不穩)。
+- 拍照:後端 `/read-image` 只接受 `ALLOWED_IMAGE_TYPES`(jpg/png/webp/gif)、base64 上限約 6MB、套同一個速率限制;指令只 OCR、不描述圖片/不認人。讀出文字一律回前端讓使用者檢查後再走 `/magic` 把關(OCR 端點本身不做作文)。
 
 ### V0.5.0 模式擴充(維護重點)
 
