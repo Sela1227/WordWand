@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>WordWand 成語魔法屋</title>
 <!-- 自訂 favicon（本專案不套 SELA logo，使用專屬可愛標記）。相對路徑：GitHub Pages 子路徑安全（坑 #39） -->
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
@@ -14,8 +14,14 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
-  html, body { margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  html, body { margin: 0; padding: 0; overflow-x: hidden; }
   #root { min-height: 100vh; }
+  /* 手機:消除點擊 300ms 延遲與灰色高亮、防止文字被選取 */
+  button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  button:active { filter: brightness(0.95); }
+  textarea { -webkit-tap-highlight-color: transparent; }
   @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
   @keyframes twinkle { 0%,100%{opacity:0.2;transform:scale(0.7)} 50%{opacity:1;transform:scale(1.1)} }
   @keyframes dotjump { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-10px)} }
@@ -28,7 +34,7 @@
 <script type="text/babel">
 const { useState } = React;
 
-const VERSION = "V0.3.0";
+const VERSION = "V0.3.1";
 
 /* ====================================================================== */
 /*  ★★★ 唯一需要你修改的地方:把下面換成你的 Railway 後端網址 ★★★         */
@@ -250,7 +256,7 @@ function App() {
 /* 跨平台中文字型 fallback chain（kit 靜態頁示範 5.4） */
 const baseFont = "'Noto Sans TC', system-ui, -apple-system, 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans CJK TC', 'Segoe UI', sans-serif";
 const S = {
-  root:{ fontFamily:baseFont, background:"radial-gradient(120% 120% at 50% 0%, #E6F5FF 0%, #F1FAFF 38%, #FFEFF6 100%)", minHeight:"100vh", padding:"18px 12px 28px", boxSizing:"border-box" },
+  root:{ fontFamily:baseFont, background:"radial-gradient(120% 120% at 50% 0%, #E6F5FF 0%, #F1FAFF 38%, #FFEFF6 100%)", minHeight:"100vh", padding:"calc(18px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))", boxSizing:"border-box" },
   shell:{ maxWidth:460, margin:"0 auto" },
   tabs:{ display:"flex", gap:6, background:"rgba(255,255,255,0.5)", padding:5, borderRadius:18, marginBottom:16 },
   tab:{ flex:1, border:"none", borderRadius:14, padding:"10px 8px", fontFamily:baseFont, fontWeight:700, fontSize:15, cursor:"pointer", transition:"all .2s" },
@@ -268,7 +274,7 @@ const S = {
   inputLabel:{ margin:"18px 4px 8px", fontSize:14, fontWeight:700, color:"#6B5F6E" },
   textarea:{ width:"100%", boxSizing:"border-box", border:"2.5px solid #F0E4EE", borderRadius:18, padding:"14px 16px", fontFamily:baseFont, fontSize:16, lineHeight:1.6, resize:"vertical", outline:"none", background:"#fff", color:"#3A2E3F" },
   exampleRow:{ display:"flex", gap:8, flexWrap:"wrap", margin:"10px 2px 0" },
-  exChip:{ border:"2px dashed #E3D3DE", background:"#fff", borderRadius:999, padding:"6px 12px", fontFamily:baseFont, fontSize:12.5, color:"#8A7C8C", cursor:"pointer" },
+  exChip:{ border:"2px dashed #E3D3DE", background:"#fff", borderRadius:999, padding:"9px 14px", fontFamily:baseFont, fontSize:13, color:"#8A7C8C", cursor:"pointer" },
   castBtn:{ width:"100%", marginTop:16, border:"none", borderRadius:20, padding:"16px", color:"#fff", fontFamily:baseFont, fontWeight:900, fontSize:18, letterSpacing:2, boxShadow:"0 10px 22px rgba(160,110,140,0.28)" },
   loadingBox:{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, padding:"22px 0 6px" },
   dots:{ display:"flex", gap:8 },

@@ -1,7 +1,7 @@
 <div align="center">
   <h1>WordWand · 成語魔法屋</h1>
   <p>陪小朋友把普通句子變成漂亮成語的寫作小幫手</p>
-  <p><strong>V0.3.0</strong></p>
+  <p><strong>V0.3.1</strong></p>
 </div>
 
 ---
@@ -84,8 +84,8 @@ WordWand/
 
 ## 版本
 
-V0.3.0
+V0.3.1
 
 ---
 
-> Made by **SELA** · V0.3.0
+> Made by **SELA** · V0.3.1
