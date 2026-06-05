@@ -1,38 +1,72 @@
 #!/usr/bin/env python3
 """
 WordWand (成語魔法屋) - 後端代理 (FastAPI)
-功能：藏 Claude API key / 伺服器端組 prompt / 兒童安全把關 / 回傳結構化 JSON
+功能：藏 Claude API key / 伺服器端組 prompt / 兒童安全把關 / CORS 收斂 / 速率限制 / 回傳結構化 JSON
 適用：Python 3.10+ / FastAPI 0.115 / 部署於 Railway（檔案在 repo 根目錄，免設 Root Directory）
 
-安全設計（V0.2.0）：兩道防線都在伺服器端，前端無法繞過——
-  1. 範圍鎖定：只幫忙改寫「想變漂亮的句子」，其餘問題（問知識、聊天、要求做別的事）一律不答，溫柔請小朋友給句子。
-  2. 內容把關：任何不適合兒童的字句（暴力 / 性 / 成人 / 驚悚 / 自傷 / 毒品 / 髒話 / 仇恨等）一律不處理、不複述，只給溫柔引導。
-由模型在 JSON 回傳 "ok" 旗標判定：ok=true 才改寫，ok=false 回 redirect 引導語。
+安全設計：
+  1. 範圍鎖定：只幫忙改寫「想變漂亮的句子」，其餘問題一律不答（後端 ok 旗標 + fail-safe）。
+  2. 內容把關：不適合兒童的字句一律不處理、不複述，只給溫柔引導。
+  3. CORS：只放行自己的 GitHub Pages 來源（V0.3.0）。
+  4. 速率限制：同一 IP 每分鐘上限，保護 API 額度（V0.3.0，記憶體版，單一 replica 有效）。
 """
 
-VERSION = "V0.2.3"
+VERSION = "V0.3.0"
 
 import os
 import json
+import time
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 app = FastAPI(title="WordWand API", version=VERSION)
 
-# --- CORS：允許你的 GitHub Pages 來呼叫 ---
-# 上線後建議把 "*" 改成你的網址，例如 "https://sela1227.github.io"
+# --- CORS：只放行自己的 GitHub Pages 來源（來源只看 scheme+網域，不含路徑） ---
+ALLOWED_ORIGINS = [
+    "https://sela1227.github.io",   # 你的 GitHub Pages（站台路徑為 /WordWand/，但來源只到網域）
+    "http://localhost:8000",        # 本地測試前端用
+    "http://127.0.0.1:8000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 MODEL = "claude-haiku-4-5-20251001"   # 便宜又快，足夠改寫用；要更強可換 claude-sonnet-4-6
+
+# --- 速率限制（記憶體版滑動視窗；單一 replica 有效，hobby 規模夠用） ---
+RATE_LIMIT_MAX = 20      # 每個 IP 在視窗內最多次數
+RATE_LIMIT_WINDOW = 60   # 視窗秒數
+_hits: dict[str, list[float]] = {}
+
+
+def _client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _rate_limited(ip: str) -> bool:
+    now = time.time()
+    recent = [t for t in _hits.get(ip, []) if now - t < RATE_LIMIT_WINDOW]
+    if len(recent) >= RATE_LIMIT_MAX:
+        _hits[ip] = recent
+        return True
+    recent.append(now)
+    _hits[ip] = recent
+    # 機會性清理：避免長期累積空清單
+    if len(_hits) > 5000:
+        for k in [k for k, v in _hits.items() if not v]:
+            _hits.pop(k, None)
+    return False
+
 
 # --- 兒童安全 + 範圍鎖定（最優先，凌駕一切；放在 prompt 最前面） ---
 SAFETY = (
@@ -56,7 +90,6 @@ TASKS = {
     "senses": "任務：把小朋友這句普通的句子，加上生動的「五官（視覺、聽覺、嗅覺、味覺、觸覺）」描寫，讓句子更有畫面。",
 }
 
-# ok=true 才有 upgraded/items/cheer；ok=false 只回 redirect 溫柔引導語
 SCHEMA_OK = {
     "idiom": '"upgraded":"改寫後完整通順的句子","items":[{"word":"成語","meaning":"白話意思","why":"為什麼適合"}],"cheer":"用你的語氣對小朋友說的一句鼓勵"',
     "senses": '"upgraded":"加入感官描寫後完整通順的句子","items":[{"word":"用到的感官","meaning":"描寫了什麼","why":"這樣寫的好處"}],"cheer":"用你的語氣對小朋友說的一句鼓勵"',
@@ -75,7 +108,9 @@ def health():
 
 
 @app.post("/magic")
-async def magic(req: MagicRequest):
+async def magic(req: MagicRequest, request: Request):
+    if _rate_limited(_client_ip(request)):
+        raise HTTPException(429, "小精靈有點忙，休息一下下，等幾秒再按一次「變身」喔！")
     if not ANTHROPIC_API_KEY:
         raise HTTPException(500, "伺服器尚未設定 ANTHROPIC_API_KEY")
     if req.spirit not in PERSONAS or req.mode not in TASKS:
@@ -119,7 +154,7 @@ async def magic(req: MagicRequest):
     except json.JSONDecodeError:
         raise HTTPException(502, "AI 回傳格式有誤，請再試一次")
 
-    # 後端再保險一次：格式不對 / 未明確 ok=true 就當作不通過，回安全引導語（fail-safe）
+    # 後端再保險一次：非明確 ok=true 一律當不通過，回安全引導語（fail-safe）
     if not isinstance(data, dict) or data.get("ok") is not True:
         fallback = "我們在成語魔法屋只幫你把句子變漂亮喔！請給我一句你想升級的句子吧！"
         redirect = data.get("redirect") if isinstance(data, dict) else fallback

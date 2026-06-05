@@ -16,8 +16,8 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.2.3
-- **狀態:** 已上線(後端 Railway 運作中、前端已接入正式網址;待把 CORS 收斂)
+- **版本:** V0.3.0
+- **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** 給國小學生的 AI 寫作小幫手——把普通句子變成含成語/感官描寫的句子,三精靈不同語氣;英文品牌名 WordWand,中文功能名成語魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
 - **入口點:** 前端 `docs/index.html` 的 `App()`;後端 `main.py`(repo 根目錄)的 `app`(`POST /magic`)
@@ -55,6 +55,8 @@
 | 兒童安全規則(範圍鎖定 + 內容把關) | `main.py` 的 `SAFETY` 常數(放 prompt 最前面,最優先) |
 | ok=false 引導畫面 | `docs/index.html` 結果區「result.ok === false」分支 |
 | 模型、單句長度上限 | `main.py` 的 `MODEL` / `len(text) > 200` |
+| 允許的前端來源(CORS) | `main.py` 的 `ALLOWED_ORIGINS` |
+| 速率限制次數/視窗 | `main.py` 的 `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW` |
 | 介面樣式 | `docs/index.html` 結尾的 `S` 樣式物件 |
 
 > **契約提醒:** 前端送 `{spirit, mode, text}`;後端回 `{ok:true, upgraded, items[], cheer}` 或 `{ok:false, redirect}`。前端依 `ok` 分流渲染,改欄位名兩邊要同改。
@@ -136,21 +138,27 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.2.1 | 配色微調:SELA 指定改為輕爽天藍 + 粉色系(尼尼粉 / 奇奇天藍 / 麥克斯薰衣草藍紫),背景天藍漸層、theme-color/favicon 同步 |
 | V0.2.2 | 部署結構修正:後端三檔從 backend/ 移到 repo 根目錄(解 Railway 子目錄 build 失敗,坑 #1);前端維持 docs/ |
 | V0.2.3 | 後端部署成功(Railway),前端 BACKEND_URL 接入正式網址 wordwand-production-2a37.up.railway.app |
+| V0.3.0 | 安全收尾:CORS 收斂到 https://sela1227.github.io、加每 IP 速率限制(20 次/分,記憶體版) |
 
 ---
 
 ## 七、下版候選工作(按優先序)
 
-1. **把後端 CORS 從 `*` 收斂到自己的 GitHub Pages 網址** — 第 1 名:後端已上線且 CORS 全開,任何網站都能借用你的 key 呼叫,屬安全前置(填入 Pages 網址即可)。
-2. 後端加簡單速率限制(防同一 IP 短時間大量呼叫,保護 API 額度;對兒童公開服務尤其重要)。
-3. 結果加「複製給老師看」按鈕(把改寫結果一鍵複製成純文字)。
-4. 第三個分頁「開頭結尾魔法」(教轉場/開頭句)。
-5. 把精靈人格、模式、SAFETY 抽成 `backend/config.json`,改規則不用動程式。
-6. 前端載入時先 ping 後端 `/`,顯示「小精靈準備好了」狀態。
+1. **結果加「複製給老師看」按鈕** — 第 1 名:小朋友寫完最常見的下一步就是交出去,一鍵複製成純文字最實用。
+2. 第三個分頁「開頭結尾魔法」(教轉場/開頭句)。
+3. 把精靈人格、模式、SAFETY 抽成 `config.json`,改規則不用動程式。
+4. 前端載入時先 ping 後端 `/`,顯示「小精靈準備好了」狀態。
+5. 速率限制升級為跨 replica 版(若未來加開多台 replica,記憶體版會各算各的;屆時改用外部儲存或 slowapi)。
 
 ---
 
 ## 八、升版必讀(如有)
+
+### V0.3.0 安全收尾(注意事項)
+
+- CORS 預設只放行 `https://sela1227.github.io`(在 `ALLOWED_ORIGINS`)。換 Pages 網域要同步改,否則前端會被擋。
+- 速率限制是『記憶體版』,**只在單一 replica 內有效**。Railway 若加開多台 replica,每台各算各的;真要嚴格全域限流再換外部儲存(Redis)或 slowapi。
+- 本地測試前端時,來源要是 `http://localhost:8000` / `127.0.0.1:8000` 才不被 CORS 擋(已放行)。
 
 ### V0.2.2 結構變更
 
@@ -167,4 +175,4 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 
 ## 九、一句話總結
 
-V0.2.3:後端已成功部署在 Railway、前端接入正式網址,全線打通;前面 V0.2.2 解掉子目錄 build 坑、V0.2.1 配色天藍+粉、V0.2.0 兒童安全雙閘 + 品牌名 WordWand;下版第一優先是把後端 CORS 從 `*` 收斂到自己的 GitHub Pages 網址。
+V0.3.0:安全收尾完成——CORS 收斂到自己的 Pages 來源、加上每 IP 速率限制;至此後端上線、前端接好、把關齊全(範圍鎖定 + 內容把關 + CORS + 限流);下版第一優先是結果加「複製給老師看」按鈕。
