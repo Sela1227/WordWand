@@ -34,7 +34,7 @@
 <script type="text/babel">
 const { useState } = React;
 
-const VERSION = "V0.5.0";
+const VERSION = "V0.5.2";
 
 /* ====================================================================== */
 /*  ★★★ 唯一需要你修改的地方:把下面換成你的 Railway 後端網址 ★★★         */
@@ -53,39 +53,39 @@ const SPIRITS = {
     intro:"麥克斯超有活力!我們一起把無聊的句子,變成超酷的成語魔法吧!" },
 };
 const MODES = {
-  idiom: { key:"idiom", title:"成語變身術", btn:"變身!", inputLabel:"輸入你想練習的句子:",
-    blurb:"你常常寫「很生氣」、「哭得很慘」、「天氣很漂亮」嗎?把句子放進來,小精靈會幫你找出好用的成語!",
-    placeholder:"我今天考了一百分,心裡非常高興。",
-    itemLabels:{meaning:"意思",why:"為什麼適合"},
-    examples:["我今天考了一百分,心裡非常高興。","弟弟把房間弄得很亂。","今天的夕陽真的好漂亮。"] },
-  senses:{ key:"senses", title:"五感放大鏡", btn:"變身!", inputLabel:"輸入你想練習的句子:",
-    blurb:"好的描寫會用到眼睛、耳朵、鼻子、嘴巴和皮膚。把句子放進來,小精靈會幫你加上生動的感官描寫!",
-    placeholder:"我走進了廚房。",
-    itemLabels:{meaning:"描寫",why:"好處"},
-    examples:["我走進了廚房。","外面開始下雨了。","媽媽煮了一鍋湯。"] },
-  gym:   { key:"gym", title:"句子健身房", btn:"幫我看看!", inputLabel:"輸入你想練習的句子:",
-    blurb:"把你寫的句子放進來,小精靈像教練一樣,告訴你哪裡可以練得更強壯、還有怎麼改,讓你自己越寫越棒!",
-    placeholder:"我今天去公園玩,很開心。",
-    itemLabels:{meaning:"說明",why:"怎麼改"},
-    resultHint:"教練幫你看看可以更強的地方:",
-    examples:["我今天去公園玩,很開心。","那隻狗很大很大。","我吃了飯然後去睡覺。"] },
-  grow:  { key:"grow", title:"句子長大樹", btn:"讓它長大!", inputLabel:"輸入一句話,讓它長大:",
-    blurb:"只寫了一句話,不知道怎麼變多嗎?把句子放進來,小精靈會問你幾個問題,跟著想一想,一句話就會長成一段!",
-    placeholder:"今天我去了動物園。",
-    resultHint:"跟著這幾個問題想一想,再自己寫寫看:",
-    examples:["今天我去了動物園。","昨天下雨了。","我有一個好朋友。"] },
   ideas: { key:"ideas", title:"靈感泡泡", btn:"給我點子!", inputLabel:"輸入一個主題詞:",
     blurb:"不知道要寫什麼嗎?給小精靈一個主題,它會吹出好多靈感泡泡,從不同角度幫你打開思路!",
-    placeholder:"下雨天",
+    placeholder:"我的學校",
     itemLabels:{meaning:"想想看"},
     resultHint:"這些靈感泡泡,挑你喜歡的寫進去:",
     examples:["下雨天","我的好朋友","我最喜歡的食物"] },
   outline:{ key:"outline", title:"作文藏寶圖", btn:"畫藏寶圖!", inputLabel:"輸入你的作文題目:",
     blurb:"拿到題目不知道怎麼開始嗎?把題目給小精靈,它會幫你畫一張藏寶圖,告訴你開頭、經過、結尾各寫什麼!",
-    placeholder:"我最難忘的一天",
+    placeholder:"快樂的一天",
     itemLabels:{meaning:"可以寫什麼"},
     resultHint:"照著這張藏寶圖,一段一段自己寫:",
     examples:["我最難忘的一天","我的家人","一次失敗的經驗"] },
+  gym:   { key:"gym", title:"句子健身房", btn:"幫我看看!", inputLabel:"輸入你想練習的句子:",
+    blurb:"把你寫的句子放進來,小精靈像教練一樣,告訴你哪裡可以練得更強壯、還有怎麼改,讓你自己越寫越棒!",
+    placeholder:"天氣很好,我們出去玩。",
+    itemLabels:{meaning:"說明",why:"怎麼改"},
+    resultHint:"教練幫你看看可以更強的地方:",
+    examples:["我今天去公園玩,很開心。","那隻狗很大很大。","我吃了飯然後去睡覺。"] },
+  grow:  { key:"grow", title:"魔法長大樹", btn:"讓它長大!", inputLabel:"輸入一句話,讓它長大:",
+    blurb:"只寫了一句話,不知道怎麼變多嗎?把句子放進來,小精靈會問你幾個問題,跟著想一想,一句話就會長成一段!",
+    placeholder:"我吃了一個冰淇淋。",
+    resultHint:"跟著這幾個問題想一想,再自己寫寫看:",
+    examples:["今天我去了動物園。","昨天下雨了。","我有一個好朋友。"] },
+  idiom: { key:"idiom", title:"成語變身術", btn:"變身!", inputLabel:"輸入你想練習的句子:",
+    blurb:"你常常寫「很生氣」、「哭得很慘」、「天氣很漂亮」嗎?把句子放進來,小精靈會幫你找出好用的成語!",
+    placeholder:"他跑得很快很快。",
+    itemLabels:{meaning:"意思",why:"為什麼適合"},
+    examples:["我今天考了一百分,心裡非常高興。","弟弟把房間弄得很亂。","今天的夕陽真的好漂亮。"] },
+  senses:{ key:"senses", title:"五感放大鏡", btn:"變身!", inputLabel:"輸入你想練習的句子:",
+    blurb:"好的描寫會用到眼睛、耳朵、鼻子、嘴巴和皮膚。把句子放進來,小精靈會幫你加上生動的感官描寫!",
+    placeholder:"我打開了窗戶。",
+    itemLabels:{meaning:"描寫",why:"好處"},
+    examples:["我走進了廚房。","外面開始下雨了。","媽媽煮了一鍋湯。"] },
 };
 
 function Mascot({ type, color, size=72, animate=true }) {
@@ -137,7 +137,7 @@ function Sparkle({ top, left, size=16, delay=0 }) {
 
 function App() {
   const [spiritKey, setSpiritKey] = useState("nini");
-  const [mode, setMode] = useState("idiom");
+  const [mode, setMode] = useState("ideas");
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
