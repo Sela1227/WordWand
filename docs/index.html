@@ -33,7 +33,7 @@
 <script type="text/babel">
 const { useState, useRef } = React;
 
-const VERSION = "V0.10.0";
+const VERSION = "V0.11.0";
 
 /* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";
@@ -337,7 +337,7 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
     if (BACKEND_URL.includes("YOUR-APP")) { setError("還沒設定後端網址喔!"); return; }
     setLoading(true); setResult(null); setError(""); stopSpeak(); setCopyMsg("");
     try {
-      const res = await fetch(`${BACKEND_URL}/magic`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ spirit:spiritKey, mode, stage, text:input }) });
+      const res = await fetch(`${BACKEND_URL}/magic`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ spirit:spiritKey, mode, stage, theme:variant, text:input }) });
       if (!res.ok) throw new Error("bad");
       setResult(await res.json());
     } catch(_) { setError("小精靈的魔法棒打了一個盹,再按一次試試看吧!"); }

@@ -11,7 +11,7 @@ WordWand (作文魔法屋) - 後端代理 (FastAPI)
   4. 速率限制：同一 IP 每分鐘上限，保護 API 額度（V0.3.0，記憶體版，單一 replica 有效）。
 """
 
-VERSION = "V0.10.0"
+VERSION = "V0.11.0"
 
 import os
 import json
@@ -92,9 +92,23 @@ STAGES = {
 }
 
 PERSONAS = {
-    "nini": "你的角色是『尼尼』，溫柔有耐心，像溫暖的大姐姐。先肯定再溫柔引導，用字簡單。",
-    "kiki": "你的角色是『奇奇』，博學沉穩，像親切的小老師，喜歡補充成語由來（用小朋友懂的方式），解釋清楚不囉嗦。",
-    "max":  "你的角色是『麥克斯』，活潑熱情有幹勁，喜歡用短句和驚嘆語氣讓寫作變好玩，但不浮誇到看不懂。",
+    "nini": "你的角色是『尼尼』，個性溫柔、有耐心。先肯定學生、再溫柔引導，常用「沒關係」「慢慢來」「你做得很好」這類安撫的話；用字柔和、句子不急不催。",
+    "kiki": "你的角色是『奇奇』，個性博學、沉穩，像愛講解的小老師。總是多說一點『為什麼』和背後的小知識（用該學段聽得懂的方式），條理清楚、愛用「因為…所以…」；冷靜、精準、不浮誇。",
+    "max":  "你的角色是『麥克斯』，個性活潑、熱血、有幹勁。愛用短句、比喻和加油打氣（像「衝吧！」「這句超有畫面！」）讓寫作變好玩；熱情但仍要讓人看得懂。",
+}
+
+# 語氣依「學段」調整（同一隻精靈，對不同年級講話方式不同）
+STAGE_TONE = {
+    "es": "語氣：像低年級老師，句子短、多鼓勵，可用一點疊字，活潑親切。",
+    "jh": "語氣：像親切的學長姐，正常口語、自然，不裝可愛、不用疊字。",
+    "sh": "語氣：像沉穩的助教，精簡、成熟、給予尊重，不裝可愛、少用疊字與過多驚嘆號。",
+}
+
+# 風格語感（只輕微點綴，不可蓋過個性與學段）
+THEME_TONE = {
+    "cute": "",
+    "nordic": "風格語感（輕微）：用字平靜、簡潔、有留白感，少用驚嘆號。",
+    "scifi": "風格語感（輕微）：用字俐落、帶一點點科技／系統感，但仍自然好懂、不堆術語。",
 }
 
 TASKS = {
@@ -131,6 +145,7 @@ class MagicRequest(BaseModel):
     spirit: str = "nini"
     mode: str = "idiom"
     stage: str = "es"
+    theme: str = "cute"
     text: str
 
 
@@ -156,12 +171,17 @@ async def magic(req: MagicRequest, request: Request):
     if not text or len(text) > 200:
         raise HTTPException(400, "句子長度需介於 1～200 字")
 
+    theme_tone = THEME_TONE.get(req.theme, "")
     prompt = (
         f"{SAFETY_BASE}\n"
         f"{STAGES[req.stage]['clause']}\n\n"
-        f"{PERSONAS[req.spirit]}\n\n"
+        f"{PERSONAS[req.spirit]}\n"
+        f"{STAGE_TONE[req.stage]}\n"
+        + (f"{theme_tone}\n" if theme_tone else "")
+        + "請讓你的個性『明顯』表現在所有說明文字、尤其是 cheer 鼓勵語的用字與語氣上（三種角色讀起來要明顯不同）；"
+        "但無論什麼個性，教學內容本身都要正確、不偷工。\n\n"
         f"{TASKS[req.mode]}\n"
-        f"對象是{STAGES[req.stage]['label']}學生，用字深度與題材都要依這個學段調整；語氣正面、鼓勵。\n"
+        f"對象是{STAGES[req.stage]['label']}學生，用字深度與題材都要依這個學段調整。\n"
         f"只回傳一個 JSON 物件，前後不要有任何說明文字或 markdown 標記。先判斷安全與範圍：\n"
         f'- 適合且是要做的寫作練習 → {{"ok":true,{SCHEMA_OK[req.mode]}}}\n'
         f'- 不適合或不是要做寫作練習 → {{"ok":false,"redirect":"用你的語氣、溫柔地請學生給一個適合的題目或句子（不要複述不當內容）"}}\n\n'

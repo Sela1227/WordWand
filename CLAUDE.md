@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.10.0
+- **版本:** V0.11.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** AI 作文練習小幫手,主打國小、可切國中/高中;六~七種寫作模式 + 三精靈 + 分齡安全;英文品牌 WordWand、中文名作文魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -51,7 +51,8 @@
 | 精靈外觀(名稱/配色/介紹) | `docs/index.html` 的 `SPIRITS` 物件 |
 | 精靈人格語氣 | `main.py` 的 `PERSONAS`(改這裡才會變語氣,前端只是顯示) |
 | 六模式說明/範例/按鈕/欄位標籤 | `docs/index.html` 的 `MODES`(每模式含 title/btn/inputLabel/itemLabels/resultHint) |
-| AI 任務指令 / 回傳格式(六模式) | `main.py` 的 `TASKS` / `SCHEMA_OK` |
+| AI 任務指令 / 回傳格式 | `main.py` 的 `TASKS` / `SCHEMA_OK` |
+| 精靈個性 / 學段語氣 / 風格語感 | `main.py` 的 `PERSONAS`(三隻明顯不同)+ `STAGE_TONE`(隨學段)+ `THEME_TONE`(隨風格,輕微) |
 | 安全紅線(全齡通用) | `main.py` 的 `SAFETY_BASE` |
 | 各學段題材/用字規則 | `main.py` 的 `STAGES`(es/jh/sh) |
 | 議論模式(國中/高中限定) | `main.py` TASKS/SCHEMA 的 `argue`;前端 MODES.argue 的 `stages:["jh","sh"]` |
@@ -72,7 +73,7 @@
 | 速率限制次數/視窗 | `main.py` 的 `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW` |
 | 介面樣式 | `docs/index.html` 結尾的 `S` 樣式物件 |
 
-> **契約提醒:** 前端送 `{spirit, mode, stage, text}`(stage = es/jh/sh,預設 es);後端依 mode 回不同形狀(都含 `ok`):
+> **契約提醒:** 前端送 `{spirit, mode, stage, theme, text}`(stage=es/jh/sh;theme=cute/nordic/scifi,只影響語氣不影響安全);後端依 mode 回不同形狀(都含 `ok`):
 > - idiom/senses → `{ok:true, upgraded, items[], cheer}`
 > - gym(健身房)→ `{ok:true, items[], cheer}`(items=「可改進點+說明+怎麼改」)
 > - grow(長大樹)→ `{ok:true, questions[], cheer}`(引導問題字串陣列)
@@ -175,6 +176,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 | V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
 | V0.8.0 | 加學段切換(國小/國中/高中,預設國小):紅線全齡通用、題材/用字隨學段放寬、「只做寫作練習」scope 全齡不變;國中/高中多開「議論小教練」;模式依學段過濾顯示 |
+| V0.11.0 | 精靈語氣分層:PERSONAS 強化三隻個性(回答明顯不同)、STAGE_TONE 隨學段(國小活潑/國中口語/高中沉穩)、THEME_TONE 隨風格輕微點綴(科幻俐落/北歐平靜);前端 /magic 多送 theme |
 | V0.10.0 | 中學三風格各有專屬造型精靈(可愛泡泡/北歐鵝卵石/科幻機器人)+ 名字隨風格(諾雅艾文芬恩/露娜賽法澤洛);個性與後端 spirit 代碼不變,只換顯示皮膚 |
 | V0.9.0 | 前端大改:入口門檻頁(國小直接進/中學需通行碼→選國中高中)、中學可切可愛/北歐極簡/科幻三主題(THEMES+makeStyles(pal))、中學模式用正式名(titleFormal)、議論加議題類別(ISSUE_TOPICS,耐久思辨題)、← 換身分回門檻。後端僅版號對齊(主題/密碼/議題皆前端) |
 
