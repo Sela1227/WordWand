@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.12.0
+- **版本:** V0.12.1
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** AI 作文練習小幫手,主打國小、可切國中/高中;六~七種寫作模式 + 三精靈 + 分齡安全;英文品牌 WordWand、中文名作文魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -125,7 +125,14 @@ P4. (種子,坑 #13/SW)前端跨域呼叫第三方被擋
    - 做法:兩條路擇一——(A) Railway 服務 Settings → Build → Root Directory 設 `backend`;(B) 直接把後端檔放 repo 根目錄。本專案 V0.2.2 採 (B),最省事、免設定
    - 通用性:任何 monorepo / 多資料夾 repo 部署到 Railway 都會遇到
 
-2. **Web Speech API(語音辨識)在 iOS Safari 支援不穩**
+2. **語音合成(念給你聽)會抓到大陸口音**
+   - 症狀:設了 `u.lang="zh-TW"` 仍念成大陸口音
+   - 原因:`lang` 只是偏好,實際語音由系統挑;很多裝置預設中文語音是 zh-CN
+   - 做法:用 `speechSynthesis.getVoices()` 主動挑 zh-TW(或名稱含 臺灣/國語/美佳/雅婷)的語音,設給 `u.voice`;並監聽 `onvoiceschanged` 預熱(語音清單非同步載入)
+   - 限制:**最終仍取決於該裝置有沒有安裝台灣中文語音**;若完全沒有,只能退香港或其它中文。可建議使用者在系統「語音」設定裝台灣語音
+   - 通用性:任何用瀏覽器語音合成、又在意口音的專案
+
+3. **Web Speech API(語音辨識)在 iOS Safari 支援不穩**
    - 症狀:`webkitSpeechRecognition` 物件存在(偵測會通過),但 iPhone/iPad 上常常按了沒反應或辨識失敗
    - 原因:Safari 對 Web Speech API 的支援長期不完整、且各 iOS 版本行為不一
    - 做法:只用 `!!SR` 偵測「存在才顯示麥克風鈕」+ 完整 onerror 處理(權限/辨識失敗給友善提示);**不要假設顯示了就一定能用**。iOS 為主的族群,拍照輸入(走後端 vision)比語音可靠
@@ -176,6 +183,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 | V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
 | V0.8.0 | 加學段切換(國小/國中/高中,預設國小):紅線全齡通用、題材/用字隨學段放寬、「只做寫作練習」scope 全齡不變;國中/高中多開「議論小教練」;模式依學段過濾顯示 |
+| V0.12.1 | 「念給你聽」改善口音:主動挑台灣中文語音(zh-TW/美佳/雅婷/國語(臺灣)),避免系統預設抓到大陸口音;預熱語音清單。受限於裝置有無安裝台灣語音 |
 | V0.12.0 | PWA:可加到主畫面(standalone、PNG 圖示 192/512/iOS180、Service Worker 離線開殼)。SW 對後端 API 一律走網路不快取 |
 | V0.11.0 | 精靈語氣分層:PERSONAS 強化三隻個性(回答明顯不同)、STAGE_TONE 隨學段(國小活潑/國中口語/高中沉穩)、THEME_TONE 隨風格輕微點綴(科幻俐落/北歐平靜);前端 /magic 多送 theme |
 | V0.10.0 | 中學三風格各有專屬造型精靈(可愛泡泡/北歐鵝卵石/科幻機器人)+ 名字隨風格(諾雅艾文芬恩/露娜賽法澤洛);個性與後端 spirit 代碼不變,只換顯示皮膚 |
