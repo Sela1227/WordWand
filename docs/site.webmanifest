@@ -1,12 +1,18 @@
 {
   "name": "WordWand 作文魔法屋",
-  "short_name": "WordWand",
-  "description": "陪國小學生練習作文的 AI 小幫手:成語、感官、修句、擴寫、靈感、大綱",
-  "icons": [
-    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
-  ],
+  "short_name": "作文魔法屋",
+  "description": "陪學生練習作文的 AI 小幫手:成語、感官、修句、擴寫、靈感、大綱、議論",
+  "lang": "zh-Hant-TW",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
   "theme_color": "#54B9EC",
   "background_color": "#EAF6FF",
-  "display": "standalone",
-  "start_url": "./"
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
 }

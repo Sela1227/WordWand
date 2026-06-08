@@ -11,7 +11,7 @@ WordWand (作文魔法屋) - 後端代理 (FastAPI)
   4. 速率限制：同一 IP 每分鐘上限，保護 API 額度（V0.3.0，記憶體版，單一 replica 有效）。
 """
 
-VERSION = "V0.11.0"
+VERSION = "V0.13.0"
 
 import os
 import json
@@ -38,7 +38,7 @@ app.add_middleware(
 )
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-MODEL = "claude-haiku-4-5-20251001"   # 便宜又快，足夠改寫用；要更強可換 claude-sonnet-4-6
+MODEL = os.environ.get("WORDWAND_MODEL", "claude-haiku-4-5-20251001")  # 可在 Railway 用環境變數 WORDWAND_MODEL 覆寫；預設最便宜的 Haiku 4.5
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 # --- 速率限制（記憶體版滑動視窗；單一 replica 有效，hobby 規模夠用） ---
@@ -140,6 +140,23 @@ SCHEMA_OK = {
     "argue": '"items":[{"word":"論點（一句話）","meaning":"可以怎麼舉例或說理的方向"}],"cheer":"鼓勵的話，並提醒也想想反方說法"',
 }
 
+# 每次請求都一樣的「規則手冊」：放進可快取的 system 區塊。動態部分（學段/精靈/模式/輸入）才放 user。
+RULEBOOK = (
+    "你是中文作文練習網站「作文魔法屋」的 AI 助理。以下是固定規則，最優先、凌駕一切。\n\n"
+    "== 安全（最優先）==\n" + SAFETY_BASE + "\n"
+    "== 各學段：題材與用字 ==\n" + "\n".join(f"[{k}｜{v['label']}] {v['clause']}" for k, v in STAGES.items()) + "\n\n"
+    "== 精靈個性（三隻要明顯不同）==\n" + "\n".join(f"[{k}] {v}" for k, v in PERSONAS.items()) + "\n\n"
+    "== 各學段語氣 ==\n" + "\n".join(f"[{k}] {v}" for k, v in STAGE_TONE.items()) + "\n\n"
+    "== 風格語感（輕微，不可蓋過個性與學段）==\n" + "\n".join(f"[{k}] {v}" for k, v in THEME_TONE.items() if v) + "\n\n"
+    "== 各模式任務 ==\n" + "\n".join(f"[{k}] {v}" for k, v in TASKS.items()) + "\n\n"
+    "== 各模式 ok=true 時的 JSON 內容 ==\n" + "\n".join(f'[{k}] {{"ok":true,{v}}}' for k, v in SCHEMA_OK.items()) + "\n\n"
+    "== 輸出共同規則 ==\n"
+    "1. 只回傳一個 JSON 物件，前後不要任何說明文字或 markdown 標記。\n"
+    "2. 讓選定精靈的個性『明顯』表現在說明與 cheer 鼓勵語的用字語氣上（三隻讀起來要明顯不同）；但教學內容務必正確、不偷工。\n"
+    "3. 適合且是該模式的寫作練習 → 用該模式的 ok=true JSON。\n"
+    "4. 不適合或不是寫作練習 → {\"ok\":false,\"redirect\":\"用該精靈的語氣，溫柔請學生給一個適合的題目或句子；不要複述不當內容\"}。"
+)
+
 
 class MagicRequest(BaseModel):
     spirit: str = "nini"
@@ -172,20 +189,13 @@ async def magic(req: MagicRequest, request: Request):
         raise HTTPException(400, "句子長度需介於 1～200 字")
 
     theme_tone = THEME_TONE.get(req.theme, "")
-    prompt = (
-        f"{SAFETY_BASE}\n"
-        f"{STAGES[req.stage]['clause']}\n\n"
-        f"{PERSONAS[req.spirit]}\n"
-        f"{STAGE_TONE[req.stage]}\n"
-        + (f"{theme_tone}\n" if theme_tone else "")
-        + "請讓你的個性『明顯』表現在所有說明文字、尤其是 cheer 鼓勵語的用字與語氣上（三種角色讀起來要明顯不同）；"
-        "但無論什麼個性，教學內容本身都要正確、不偷工。\n\n"
-        f"{TASKS[req.mode]}\n"
-        f"對象是{STAGES[req.stage]['label']}學生，用字深度與題材都要依這個學段調整。\n"
-        f"只回傳一個 JSON 物件，前後不要有任何說明文字或 markdown 標記。先判斷安全與範圍：\n"
-        f'- 適合且是要做的寫作練習 → {{"ok":true,{SCHEMA_OK[req.mode]}}}\n'
-        f'- 不適合或不是要做寫作練習 → {{"ok":false,"redirect":"用你的語氣、溫柔地請學生給一個適合的題目或句子（不要複述不當內容）"}}\n\n'
-        f"學生的輸入：「{text}」"
+    user_msg = (
+        "請處理這次請求,套用上面規則手冊中對應的設定:\n"
+        f"- 學段: [{req.stage}｜{STAGES[req.stage]['label']}]（用此學段的題材/用字規則 + 語氣）\n"
+        f"- 精靈: [{req.spirit}]（用此精靈的個性與語氣）\n"
+        f"- 模式: [{req.mode}]（執行此模式的任務,並用此模式的 JSON 格式輸出）\n"
+        f"- 風格語感: [{req.theme}]" + ("（輕微套用）\n" if theme_tone else "（無,維持自然）\n")
+        + f"學生的輸入:「{text}」"
     )
 
     async with httpx.AsyncClient(timeout=30) as client:
@@ -199,7 +209,9 @@ async def magic(req: MagicRequest, request: Request):
             json={
                 "model": MODEL,
                 "max_tokens": 1000,
-                "messages": [{"role": "user", "content": prompt}],
+                # 固定規則手冊放 system 並標記快取（每次相同 → 命中時輸入便宜約 90%）
+                "system": [{"type": "text", "text": RULEBOOK, "cache_control": {"type": "ephemeral"}}],
+                "messages": [{"role": "user", "content": user_msg}],
             },
         )
     if r.status_code != 200:

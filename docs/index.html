@@ -7,6 +7,11 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="manifest" href="site.webmanifest" />
 <meta name="theme-color" content="#54B9EC" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="作文魔法屋" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -31,9 +36,9 @@
 <div id="root"></div>
 
 <script type="text/babel">
-const { useState, useRef } = React;
+const { useState, useRef, useEffect } = React;
 
-const VERSION = "V0.11.0";
+const VERSION = "V0.13.0";
 
 /* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";
@@ -366,10 +371,34 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
     } catch(_) { setCopyMsg("複製失敗,手動選取一下也可以喔!"); }
     setTimeout(()=>setCopyMsg(""), 2500);
   }
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const warm = () => window.speechSynthesis.getVoices();
+    warm();
+    window.speechSynthesis.onvoiceschanged = warm;
+    return () => { try { window.speechSynthesis.onvoiceschanged = null; } catch(_){} };
+  }, []);
+
+  function chooseZhVoice() {
+    if (typeof window === "undefined" || !window.speechSynthesis) return null;
+    const vs = window.speechSynthesis.getVoices() || [];
+    // 1) 明確的台灣中文語音(lang=zh-TW 或名稱含臺灣/台灣/國語)
+    const tw = vs.filter((v) => /zh[-_]?TW/i.test(v.lang || "") || /(臺灣|台灣|Taiwan|國語)/i.test(v.name || ""));
+    // 2) 已知好聽的台灣語音名稱優先
+    const prefer = ["美佳", "美嘉", "Meijia", "雅婷", "Yating", "漢漢", "Hanhan", "國語（臺灣）", "國語(臺灣)", "Google 國語"];
+    for (const n of prefer) { const hit = tw.find((v) => (v.name || "").includes(n)); if (hit) return hit; }
+    if (tw[0]) return tw[0];
+    // 3) 退而求其次:香港中文 → 任何中文(至少別亂念)
+    return vs.find((v) => /zh[-_]?HK/i.test(v.lang || "")) || vs.find((v) => /^zh/i.test(v.lang || "")) || null;
+  }
+
   function toggleSpeak() {
     if(typeof window==="undefined"||!window.speechSynthesis||!result) return;
     if(speaking){ stopSpeak(); return; }
-    const u=new SpeechSynthesisUtterance(buildSpeechText(result)); u.lang="zh-TW"; u.rate=0.95;
+    const u=new SpeechSynthesisUtterance(buildSpeechText(result));
+    const v=chooseZhVoice();
+    if(v){ u.voice=v; u.lang=v.lang||"zh-TW"; } else { u.lang="zh-TW"; }
+    u.rate=0.95;
     u.onend=()=>setSpeaking(false); u.onerror=()=>setSpeaking(false);
     window.speechSynthesis.cancel(); setSpeaking(true); window.speechSynthesis.speak(u);
   }
@@ -607,6 +636,12 @@ const G = {
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<Root />);
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
