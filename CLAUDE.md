@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.12.1
+- **版本:** V0.13.1
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** AI 作文練習小幫手,主打國小、可切國中/高中;六~七種寫作模式 + 三精靈 + 分齡安全;英文品牌 WordWand、中文名作文魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -53,6 +53,8 @@
 | 六模式說明/範例/按鈕/欄位標籤 | `docs/index.html` 的 `MODES`(每模式含 title/btn/inputLabel/itemLabels/resultHint) |
 | AI 任務指令 / 回傳格式 | `main.py` 的 `TASKS` / `SCHEMA_OK` |
 | 精靈個性 / 學段語氣 / 風格語感 | `main.py` 的 `PERSONAS`(三隻明顯不同)+ `STAGE_TONE`(隨學段)+ `THEME_TONE`(隨風格,輕微) |
+| 模型(可換) | `main.py` 的 `MODEL`;預設 Haiku 4.5,可用環境變數 `WORDWAND_MODEL` 覆寫(Railway 設定即可,不必改碼) |
+| Prompt 快取規則手冊 | `main.py` 的 `RULEBOOK`(固定不變,放 system + cache_control;動態的學段/精靈/模式/輸入才放 user) |
 | 安全紅線(全齡通用) | `main.py` 的 `SAFETY_BASE` |
 | 各學段題材/用字規則 | `main.py` 的 `STAGES`(es/jh/sh) |
 | 議論模式(國中/高中限定) | `main.py` TASKS/SCHEMA 的 `argue`;前端 MODES.argue 的 `stages:["jh","sh"]` |
@@ -183,6 +185,8 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 | V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
 | V0.8.0 | 加學段切換(國小/國中/高中,預設國小):紅線全齡通用、題材/用字隨學段放寬、「只做寫作練習」scope 全齡不變;國中/高中多開「議論小教練」;模式依學段過濾顯示 |
+| V0.13.1 | Mac/桌機排版優化:文字抗鋸齒、字體堆疊 PingFang TC 提前、桌機滑鼠 hover 回饋(@media hover 才生效,觸控不受影響)、大螢幕欄位加寬(ww-shell class + media query) |
+| V0.13.0 | 省成本:模型改環境變數可調(WORDWAND_MODEL,預設 Haiku 4.5);啟用 prompt 快取——固定規則整理成 RULEBOOK 放 system+cache_control,動態部分放 user。安全與行為不變,只改 prompt 結構 |
 | V0.12.1 | 「念給你聽」改善口音:主動挑台灣中文語音(zh-TW/美佳/雅婷/國語(臺灣)),避免系統預設抓到大陸口音;預熱語音清單。受限於裝置有無安裝台灣語音 |
 | V0.12.0 | PWA:可加到主畫面(standalone、PNG 圖示 192/512/iOS180、Service Worker 離線開殼)。SW 對後端 API 一律走網路不快取 |
 | V0.11.0 | 精靈語氣分層:PERSONAS 強化三隻個性(回答明顯不同)、STAGE_TONE 隨學段(國小活潑/國中口語/高中沉穩)、THEME_TONE 隨風格輕微點綴(科幻俐落/北歐平靜);前端 /magic 多送 theme |
@@ -205,6 +209,23 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 ---
 
 ## 八、升版必讀(如有)
+
+### V0.13.1 桌機/Mac 優化(技巧)
+
+- 本專案大量用 inline style(makeStyles 回傳物件),**inline 無法寫 `:hover` 或 media query**。要針對桌機/大螢幕調整,作法:在 `<style>` 寫 CSS,元素掛一個 class(如 `ww-shell`),再用 media query + `!important` 覆寫 inline(inline 優先序高,需 `!important`)。
+- hover 回饋包在 `@media (hover: hover) and (pointer: fine)`,只有真的有滑鼠的裝置生效,觸控裝置不會出現「卡在 hover 態」的問題。
+- Mac 文字偏粗糊 → `body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }`;中文在 Mac 用 PingFang TC(字體堆疊已提前)。
+
+
+### V0.13.0 省成本(運作與注意)
+
+- **模型**:`MODEL = os.environ.get("WORDWAND_MODEL", "claude-haiku-4-5-20251001")`。要換模型,在 Railway 加環境變數 `WORDWAND_MODEL`(例如想更強換 `claude-sonnet-4-6`),不必動程式。
+- **Prompt 快取**:固定規則(安全+全部學段+全部精靈+全部語氣+全部任務+全部 JSON 格式)組成 `RULEBOOK`,放在 `system` 並標 `cache_control: ephemeral`;每次請求這段都一樣 → 命中時這段輸入便宜約 90%。動態(學段/精靈/模式/風格/學生輸入)才放 user 訊息。
+- **重要取捨(誠實)**:快取只在「短時間內(約 5 分鐘 TTL)有多次請求」才命中省錢——例如整班一起用(爆量)。若是零星單人使用(間隔 > 5 分鐘),快取會過期、不命中,而且因為 system 變大(塞了全部規則),單次反而比舊版貴一點;但零星使用的絕對金額本來就很小。簡言之:**高頻省很多、低頻影響極小**。
+- **快取只省輸入**,不省輸出(輸出是 5 倍價);要再省可降 `max_tokens` 或精簡 schema。
+- **改規則要顧到**:RULEBOOK 由 SAFETY_BASE/STAGES/PERSONAS/STAGE_TONE/THEME_TONE/TASKS/SCHEMA_OK 自動組出,改這些常數,手冊會跟著更新,不必另外改。新增 mode/stage 一樣只改那些常數。
+- **驗證快取有沒有生效**:看 API 回應的 usage 裡 `cache_creation_input_tokens`(第一次寫入)與 `cache_read_input_tokens`(命中讀取);Anthropic Console 用量頁也看得到。
+
 
 ### V0.12.0 PWA(維護重點 — 重要)
 

@@ -21,10 +21,22 @@
   *, *::before, *::after { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   html, body { margin: 0; padding: 0; overflow-x: hidden; }
+  /* Mac/桌機:文字抗鋸齒,避免預設偏粗糊 */
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
   #root { min-height: 100vh; }
-  button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; cursor: pointer; }
   button:active { filter: brightness(0.95); }
   textarea, input { -webkit-tap-highlight-color: transparent; }
+  /* 只有真的有滑鼠的裝置(桌機/Mac)才給 hover 回饋,觸控不受影響 */
+  @media (hover: hover) and (pointer: fine) {
+    button { transition: transform .12s ease, filter .15s ease, box-shadow .15s ease; }
+    button:hover { filter: brightness(1.04); transform: translateY(-1px); }
+    textarea:hover { border-color: rgba(0,0,0,0.18); }
+  }
+  /* 大螢幕(Mac/桌機):欄位加寬,別擠成細長一條 */
+  @media (min-width: 720px) {
+    .ww-shell { max-width: 560px !important; }
+  }
   @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
   @keyframes twinkle { 0%,100%{opacity:0.2;transform:scale(0.7)} 50%{opacity:1;transform:scale(1.1)} }
   @keyframes dotjump { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-10px)} }
@@ -38,14 +50,14 @@
 <script type="text/babel">
 const { useState, useRef, useEffect } = React;
 
-const VERSION = "V0.12.1";
+const VERSION = "V0.13.1";
 
 /* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";
 /* ★ 中學通行碼(前端簡易鎖,非資安防線;真正保護在後端紅線)。改這裡即可。 */
 const MID_PASSWORD = "1234";
 
-const baseFont = "'Noto Sans TC', system-ui, -apple-system, 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans CJK TC', 'Segoe UI', sans-serif";
+const baseFont = "'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'PingFang TC', system-ui, 'Microsoft JhengHei', 'Noto Sans CJK TC', 'Segoe UI', sans-serif";
 
 const SPIRITS = {
   nini: { name:"尼尼", tag:"溫柔引導", color:"#FF8FB3", soft:"#FFE4EE", deep:"#C84B77",
@@ -405,7 +417,7 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
 
   return (
     <div style={S.root}>
-      <div style={S.shell}>
+      <div className="ww-shell" style={S.shell}>
         <div style={S.topBar}>
           <button style={S.exitBtn} onClick={()=>{stopSpeak();onExit();}}>← 換身分</button>
           {isMid && (
