@@ -33,9 +33,18 @@
     button:hover { filter: brightness(1.04); transform: translateY(-1px); }
     textarea:hover { border-color: rgba(0,0,0,0.18); }
   }
-  /* 大螢幕(Mac/桌機):欄位加寬,別擠成細長一條 */
+  /* 鍵盤操作(Mac 用 Tab 鍵)時看得到焦點,滑鼠點不會出現 */
+  button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid rgba(84,185,236,0.55); outline-offset: 2px; }
+  /* 中/大螢幕:門檻頁加寬、國小/中學卡片並排 */
+  @media (min-width: 640px) {
+    .ww-gate-inner { max-width: 560px !important; }
+    .ww-gate-choose { display: flex; gap: 14px; }
+    .ww-gate-choose > button { flex: 1; margin-bottom: 0 !important; }
+  }
+  /* 大螢幕(Mac/桌機):主欄加寬、分頁改 3 欄(不疊太高) */
   @media (min-width: 720px) {
     .ww-shell { max-width: 560px !important; }
+    .ww-tabs > button { flex: 1 1 calc(33.333% - 4px) !important; }
   }
   @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
   @keyframes twinkle { 0%,100%{opacity:0.2;transform:scale(0.7)} 50%{opacity:1;transform:scale(1.1)} }
@@ -50,7 +59,7 @@
 <script type="text/babel">
 const { useState, useRef, useEffect } = React;
 
-const VERSION = "V0.13.1";
+const VERSION = "V0.14.0";
 
 /* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";
@@ -131,9 +140,10 @@ const MODES = {
     blurb:"常常寫「很生氣」、「很漂亮」嗎?把句子放進來,小精靈會幫你找出好用的成語!",
     placeholder:"他跑得很快很快。", itemLabels:{meaning:"意思",why:"為什麼適合"},
     examples:["我今天考了一百分,心裡非常高興。","弟弟把房間弄得很亂。","今天的夕陽真的好漂亮。"] },
-  senses:{ key:"senses", title:"五感放大鏡", titleFormal:"感官描寫", btn:"變身!", inputLabel:"輸入你想練習的句子:",
-    blurb:"好的描寫會用到眼睛、耳朵、鼻子、嘴巴和皮膚。小精靈會幫你加上生動的感官描寫!",
-    placeholder:"我打開了窗戶。", itemLabels:{meaning:"描寫",why:"好處"},
+  senses:{ key:"senses", title:"五感放大鏡", titleFormal:"感官描寫", btn:"放大五感!", inputLabel:"輸入你想練習的句子:",
+    blurb:"好的描寫會用到眼睛、耳朵、鼻子、嘴巴和皮膚。小精靈會用五官問你幾個問題,跟著想,再自己把畫面寫進去!",
+    placeholder:"我打開了窗戶。", itemLabels:{meaning:"想想看"},
+    resultHint:"用這些感官想想看,再自己加進你的句子:",
     examples:["我走進了廚房。","外面開始下雨了。","媽媽煮了一鍋湯。"] },
   argue: { key:"argue", title:"議論小教練", titleFormal:"議論練習", btn:"想論點!", inputLabel:"輸入議題或你的看法:",
     blurb:"寫議論文時,給小教練一個議題,它會陪你想幾個論點和舉例方向,記得也想想反方,論述更周全!",
@@ -242,20 +252,22 @@ function Gate({ onEnter }) {
   const [err, setErr] = useState("");
   return (
     <div style={G.root}>
-      <div style={G.inner}>
+      <div className="ww-gate-inner" style={G.inner}>
         <div style={G.brand}>WordWand</div>
         <div style={G.title}>作文魔法屋</div>
         <div style={G.sub}>請先選擇身分</div>
-        {step==="choose" && (<>
-          <button style={G.cardES} onClick={()=>onEnter("es","es","cute")}>
-            <span style={G.cardBig}>國小</span>
-            <span style={G.cardSmall}>可愛精靈陪你練作文</span>
-          </button>
-          <button style={G.cardMID} onClick={()=>{setStep("pw");setErr("");}}>
-            <span style={G.cardBig}>中學</span>
-            <span style={G.cardSmall}>國中・高中,可自由換風格</span>
-          </button>
-        </>)}
+        {step==="choose" && (
+          <div className="ww-gate-choose">
+            <button style={G.cardES} onClick={()=>onEnter("es","es","cute")}>
+              <span style={G.cardBig}>國小</span>
+              <span style={G.cardSmall}>可愛精靈陪你練作文</span>
+            </button>
+            <button style={G.cardMID} onClick={()=>{setStep("pw");setErr("");}}>
+              <span style={G.cardBig}>中學</span>
+              <span style={G.cardSmall}>國中・高中,可自由換風格</span>
+            </button>
+          </div>
+        )}
         {step==="pw" && (<>
           <div style={G.label}>請輸入中學通行碼</div>
           <input type="password" value={pw} inputMode="numeric"
@@ -439,7 +451,7 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
           </div>
         )}
 
-        <div style={S.tabs}>
+        <div className="ww-tabs" style={S.tabs}>
           {visibleModes.map((m)=>{ const on=m.key===mode; return (
             <button key={m.key} onClick={()=>{setMode(m.key);resetOutputs();}} style={{...S.tab, background:on?pal.surface:"transparent", color:on?pal.deep:pal.muted, boxShadow:on?pal.shadow:"none"}}>{modeName(m)}</button>
           );})}

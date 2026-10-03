@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.13.1
+- **版本:** V0.14.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** AI 作文練習小幫手,主打國小、可切國中/高中;六~七種寫作模式 + 三精靈 + 分齡安全;英文品牌 WordWand、中文名作文魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -185,6 +185,8 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 | V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
 | V0.8.0 | 加學段切換(國小/國中/高中,預設國小):紅線全齡通用、題材/用字隨學段放寬、「只做寫作練習」scope 全齡不變;國中/高中多開「議論小教練」;模式依學段過濾顯示 |
+| V0.14.0 | 五感放大鏡改為啟發式:不再回 upgraded(代寫完整句),改成用五官各問一個引導問題,讓學生自己把感官細節寫進去;與其他教學型模式一致 |
+| V0.13.2 | 桌機再優化:門檻頁國小/中學卡片並排、分頁大螢幕改 3 欄、鍵盤焦點框(focus-visible)、門檻頁加寬。全走 class+media query,手機不受影響 |
 | V0.13.1 | Mac/桌機排版優化:文字抗鋸齒、字體堆疊 PingFang TC 提前、桌機滑鼠 hover 回饋(@media hover 才生效,觸控不受影響)、大螢幕欄位加寬(ww-shell class + media query) |
 | V0.13.0 | 省成本:模型改環境變數可調(WORDWAND_MODEL,預設 Haiku 4.5);啟用 prompt 快取——固定規則整理成 RULEBOOK 放 system+cache_control,動態部分放 user。安全與行為不變,只改 prompt 結構 |
 | V0.12.1 | 「念給你聽」改善口音:主動挑台灣中文語音(zh-TW/美佳/雅婷/國語(臺灣)),避免系統預設抓到大陸口音;預熱語音清單。受限於裝置有無安裝台灣語音 |
