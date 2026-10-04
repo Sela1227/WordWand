@@ -1,7 +1,7 @@
 <div align="center">
   <h1>WordWand · 作文魔法屋</h1>
   <p>陪小朋友把普通句子變成漂亮成語的寫作小幫手</p>
-  <p><strong>V0.20.0</strong></p>
+  <p><strong>V1.0.0</strong></p>
 </div>
 
 ---
@@ -22,6 +22,8 @@
 **寫作計畫板(V0.15～V0.19)**:預設主畫面。① 訂題目 → ② 想點子(靈感泡泡池,每個點子分到段落)→ ③ 排進開頭/經過/結尾(每段可加多個點子、「請精靈幫這段」可選魔法、既有點子「✦ 接著想」繼續引導)→ 看整篇總覽(步驟軌跡、流程卡、複製、念給你聽)。計畫板依年級分開暫存於目前瀏覽器;「換身分」時會詢問保留或清除;刪除點子可在 7 秒內復原。
 
 **查字小幫手(V0.20.0)**:右上「查字」,輸入「揮」或「發揮的揮」,顯示注音/拼音/部首/筆畫/意思/常用詞,田字格大字 + 筆順動畫(hanzi-writer,無資料時退回純大字),可念給你聽。
+
+**V1.0.0**:前端依職責拆成多檔(仍零 build、GitHub Pages 直接部署)，單檔 1000+ 行的維護負擔解除；行為與 V0.20.0 完全相同。
 
 **穩定性(V0.20.0,依外部審核)**:AI 回傳依各模式契約驗證(不符最多重試一次,仍不符則明確回錯);全部輸入 200 字前端即時計數與擋送;400/429/5xx 與網路錯誤顯示不同且可採取行動的訊息;OCR 超過 200 字立刻提示;速率限制清理修正。
 
@@ -97,22 +99,28 @@ uvicorn main:app --reload
 
 ```
 WordWand/
-├── main.py               FastAPI 後端代理(藏 key + 兒童安全把關)— Railway 從根目錄 build
-├── requirements.txt      鎖版相依
-├── Procfile              Railway 啟動指令
-├── docs/                 GitHub Pages 前端(Pages 從 /docs 部署)
-│   ├── index.html        主畫面(React via CDN,免建置)
-│   ├── favicon.svg       專屬可愛標記(非 SELA logo)
-│   └── site.webmanifest  PWA 設定
-├── README.md             本檔
-├── CLAUDE.md             給下次 Claude 的工作上下文
-└── .gitignore            Git 忽略清單
+├─ main.py                 後端(FastAPI)：安全規則、各模式任務與契約驗證、/magic /read-image /lookup
+├─ requirements.txt / Procfile
+├─ tests/test_schema.py    AI 回傳契約與限流清理測試(pytest)
+└─ docs/                   前端(GitHub Pages，零 build)
+   ├─ index.html           只剩 HTML 殼：meta/PWA/CDN，依序載入 js/*.jsx
+   ├─ css/app.css          全域樣式(hover / media query / 抗鋸齒)
+   ├─ js/core.jsx          版本、後端網址、通行碼、字數規則、apiPost、精靈/主題/模式設定、挑語音
+   ├─ js/palette.jsx       配色解析、主題化樣式 makeStyles、門檻頁樣式 G
+   ├─ js/icons.jsx         三種精靈造型、Spirit 分派、小圖示
+   ├─ js/gate.jsx          入口門檻頁
+   ├─ js/tool.jsx          主工具畫面
+   ├─ js/board.jsx         寫作計畫板(+ MicButton、本機暫存)
+   ├─ js/lookup.jsx        查字小幫手(田字格筆順)
+   ├─ js/app.jsx           Root、掛載、註冊 Service Worker
+   ├─ sw.js                Service Worker(快取版號須隨發版更新；預快取含上述所有檔)
+   ├─ site.webmanifest / favicon.svg / icon-192.png / icon-512.png / apple-touch-icon.png
 ```
 
 ## 版本
 
-V0.20.0（完整歷程見 CLAUDE.md「版本歷程」）
+V1.0.0（完整歷程見 CLAUDE.md「版本歷程」）
 
 ---
 
-> Made by **SELA** · V0.20.0
+> Made by **SELA** · V1.0.0

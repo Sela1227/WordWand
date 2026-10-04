@@ -1,0 +1,43 @@
+/* WordWand 全域樣式（由 index.html 載入；inline style 無法寫 hover/media query 的部分放這裡） */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { margin: 0; padding: 0; overflow-x: hidden; }
+/* Mac/桌機:文字抗鋸齒,避免預設偏粗糊 */
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+#root { min-height: 100vh; }
+button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; cursor: pointer; }
+button:active { filter: brightness(0.95); }
+textarea, input { -webkit-tap-highlight-color: transparent; }
+/* 只有真的有滑鼠的裝置(桌機/Mac)才給 hover 回饋,觸控不受影響 */
+@media (hover: hover) and (pointer: fine) {
+  button { transition: transform .12s ease, filter .15s ease, box-shadow .15s ease; }
+  button:hover { filter: brightness(1.04); transform: translateY(-1px); }
+  textarea:hover { border-color: rgba(0,0,0,0.18); }
+}
+/* 鍵盤操作(Mac 用 Tab 鍵)時看得到焦點,滑鼠點不會出現 */
+button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid rgba(84,185,236,0.55); outline-offset: 2px; }
+/* 中/大螢幕:門檻頁加寬、國小/中學卡片並排 */
+@media (min-width: 640px) {
+  .ww-gate-inner { max-width: 560px !important; }
+  .ww-gate-choose { display: flex; gap: 14px; }
+  .ww-gate-choose > button { flex: 1; margin-bottom: 0 !important; }
+}
+/* 中等寬度:主欄加寬、分頁改 3 欄(不疊太高) */
+@media (min-width: 720px) {
+  .ww-shell { max-width: 560px !important; }
+  .ww-tabs > button { flex: 1 1 calc(33.333% - 4px) !important; }
+}
+/* 寬螢幕(Mac/桌機):改橫式雙欄 — 左輸入、右結果並排 */
+.ww-rightholder { display: none; }
+@media (min-width: 900px) {
+  .ww-shell { max-width: 940px !important; }
+  .ww-body { display: flex; gap: 24px; align-items: flex-start; }
+  .ww-col-left { flex: 1 1 0; min-width: 0; }
+  .ww-col-right { flex: 1 1 0; min-width: 0; position: sticky; top: 16px; }
+  .ww-rightholder { display: flex; }
+}
+@keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+@keyframes twinkle { 0%,100%{opacity:0.2;transform:scale(0.7)} 50%{opacity:1;transform:scale(1.1)} }
+@keyframes dotjump { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-10px)} }
+@keyframes rise { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }

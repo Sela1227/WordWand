@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.20.0
+- **版本:** V1.0.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** AI 作文練習小幫手,主打國小、可切國中/高中;六~七種寫作模式 + 三精靈 + 分齡安全;英文品牌 WordWand、中文名作文魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -43,7 +43,9 @@
 
 ---
 
-## 三、關鍵檔案路徑
+## 三、關鍵檔案
+
+> **V1.0.0 起前端已拆檔**。下表中凡寫 `docs/index.html` 的前端項目,實際位置依職責在 `docs/js/*.jsx`:設定/常數/apiPost/chooseZhVoice → `core.jsx`;配色與 makeStyles/G → `palette.jsx`;精靈造型與圖示 → `icons.jsx`;Gate → `gate.jsx`;Tool(主畫面、語音/拍照/複製/朗讀)→ `tool.jsx`;Board/SectionBlock/MicButton/暫存 → `board.jsx`;StrokeBox/LookupPanel → `lookup.jsx`;Root/掛載/SW 註冊 → `app.jsx`;全域 CSS → `css/app.css`。路徑
 
 | 想改什麼 | 動哪些檔 |
 |---------|---------|
@@ -185,6 +187,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 | V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
 | V0.8.0 | 加學段切換(國小/國中/高中,預設國小):紅線全齡通用、題材/用字隨學段放寬、「只做寫作練習」scope 全齡不變;國中/高中多開「議論小教練」;模式依學段過濾顯示 |
+| V1.0.0 | 前端拆檔(審核六-1):index.html 只剩殼,程式依職責拆成 docs/js/{core,palette,icons,gate,tool,board,lookup,app}.jsx + css/app.css,Babel standalone 依序載入(零 build 不變);驗證個別/合併轉譯、43 個頂層名稱一致、無重複、載入順序正確。行為零改變。正式 1.0 |
 | V0.20.0 | 外部審核修正 + 查字:P0-1 各模式輸出契約驗證(validate_magic_output,不符重試一次後 502)、P0-2 計畫板依學段分 key + 換身分詢問保留/清除、P1-1 共用 apiPost 區分 400/429/5xx/網路 + 全輸入 200 字計數擋送、P1-2 rate-limit 過期 IP 真正清理、P1-5 OCR>200 立刻提示、四-2 接著想帶題目/段落/已有點子 context、四-3 刪除可復原、四-4 暫存措辭、六-2 CDN 鎖精確版本、六-3 README/handoff 同步、七 新增 tests/test_schema.py;新增查字小幫手(/lookup + StrokeBox 田字格筆順,第二層工具不加分頁) |
 | V0.19.0 | 計畫板加「整篇總覽」頁:步驟軌跡(訂題目→想靈感→分段整理→照著寫,依資料勾選)、題目、開頭/經過/結尾編號卡+箭頭流程、每段點子、空段提示、回去修改/複製整篇大綱/念給你聽;chooseZhVoice 提到全域供共用 |
 | V0.18.2 | 語音輸入抽成共用 `MicButton`;補上「作文題目」與各段「請精靈幫這段」輸入的語音(整個計畫板都能用說的);段落點子麥克風改用同元件 |
@@ -223,6 +226,17 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 ---
 
 ## 八、升版必讀(如有)
+
+### V1.0.0 前端拆檔(維護規則 — 重要)
+
+- **零 build 多檔機制**:`index.html` 用 `<script type="text/babel" src="js/x.jsx">` 依序載入,Babel standalone 會抓取、轉譯、依文件順序執行。各檔是**獨立的傳統 script**,頂層 `const/function` 進入**共享的全域詞法作用域**,所以跨檔可直接互用、不需 import/export。
+- **三條鐵律**:(1) **不可跨檔重複宣告同名**(全域詞法作用域重複 `const` 會 SyntaxError,整個 App 掛掉);(2) **頂層「立即求值」的 const 只能引用更早載入檔案的名稱**(函式內部引用則不限,因為執行時全部已載入);(3) **新增 jsx/css 檔要三處同步**:index.html 的 script/link 標籤、`sw.js` 的 SHELL 預快取清單、本節檔案地圖。
+- **載入順序**:core → palette → icons → gate → tool → board → lookup → app(app 最後,負責掛載與 SW 註冊)。
+- **驗證方式**(拆檔時用過,之後改檔可重跑):各檔個別 Babel 轉譯 + 合併轉譯 + 頂層名稱集合比對 + 跨檔重複宣告檢查 + 頂層初始式相依順序檢查。工具腳本概念見 V1.0.0 交付紀錄。
+- **本機預覽**:Babel 用 XHR 載入外部 jsx,**必須用 http 伺服器開(例如 `python3 -m http.server`),直接雙擊 file:// 會載不到**。
+- **下一階段若轉正式 build(Vite)**:現在的檔案切法可直接對應成 ES modules(每檔加 export/import 即可),這次拆檔已把這條路鋪好。
+
+
 
 ### V0.20.0 外部審核修正(維護重點)
 
