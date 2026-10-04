@@ -11,7 +11,7 @@ WordWand (作文魔法屋) - 後端代理 (FastAPI)
   4. 速率限制：同一 IP 每分鐘上限，保護 API 額度（V0.3.0，記憶體版，單一 replica 有效）。
 """
 
-VERSION = "V1.0.0"
+VERSION = "V1.0.1"
 
 import os
 import json
@@ -239,6 +239,8 @@ def validate_lookup_output(data) -> str | None:
         return "strokes invalid"
     if not isinstance(data.get("words"), list):
         return "words invalid"
+    if "note" in data and not isinstance(data.get("note"), str):
+        return "note invalid"
     return None
 
 
@@ -308,12 +310,20 @@ async def magic(req: MagicRequest, request: Request):
 
 
 LOOKUP_SYSTEM = (
-    "你是學生的中文查字小幫手。學生會輸入一個中文字，或像「發揮的揮」這樣的描述。"
-    "請找出要查的『那一個字』（若是「X的Y」，目標是 Y；若輸入多個字，取最後一個字）。"
+    "你是學生的中文查字小幫手。學生會輸入一個中文字，或用一個詞來指認某個字，像「發揮的揮」。"
+    "學生常用語音輸入或打字，所以「的」後面那個字很可能打錯或是同音錯字（例如「發揮的灰」其實要查「揮」）。"
+    "請依序用這些規則判斷目標字：\n"
+    "1. 「X的Y」：若 Y 出現在詞 X 裡，目標就是 Y。\n"
+    "2. 若 Y 不在 X 裡，但 X 裡有和 Y 同音或音近的字，目標就是 X 裡那個字（同音錯字校正），並在 note 寫：「你打的是『Y』，從『X』看來你要查的是『Z』」。\n"
+    "3. 若 X 是詞但 Y 完全對不上，取 X 的最後一個字，並在 note 說明你的判斷。\n"
+    "4. 只輸入一個詞（沒有「的」）：取最後一個字，並在 note 說明。\n"
+    "5. 只輸入一個字：就查那個字，note 留空字串。\n"
     "只回傳一個 JSON 物件，不要任何說明或 markdown："
-    '{"char":"那一個字","zhuyin":"注音（台灣標準，含聲調符號）","pinyin":"漢語拼音（含聲調）","radical":"部首",'
-    '"strokes":總筆畫數（整數）,"meaning":"用學生聽得懂的一句話解釋這個字的意思","words":["含這個字的常用詞1","詞2","詞3"]}'
-    "。全程只用繁體中文、不用簡體。若輸入沒有中文字、或是不適合學生的字詞，只回傳 {\"error\":\"請輸入一個中文字喔！\"}。"
+    '{"char":"目標字","zhuyin":"注音（台灣標準，含聲調符號）","pinyin":"漢語拼音（含聲調）","radical":"部首",'
+    '"strokes":總筆畫數（整數）,"meaning":"用學生聽得懂的一句話解釋這個字的意思","words":["含這個字的常用詞1","詞2","詞3"],'
+    '"note":"有校正或推斷就寫一句說明，否則空字串"}'
+    "。全程只用繁體中文、不用簡體。只有在完全沒有中文字、或字詞不適合學生時，才回傳 {\"error\":\"請輸入一個中文字喔！\"}；"
+    "其它情況都要盡力找出目標字，不要輕易回 error。"
 )
 
 

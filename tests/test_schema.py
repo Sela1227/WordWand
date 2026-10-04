@@ -54,6 +54,8 @@ def test_lookup_schema():
     assert main.validate_lookup_output({**good, "char": "發揮"}) is not None
     assert main.validate_lookup_output({**good, "strokes": "12"}) is not None
     assert main.validate_lookup_output({"error": "請輸入一個中文字喔！"}) is None
+    assert main.validate_lookup_output({**good, "note": "你打的是『灰』，從『發揮』看來你要查的是『揮』"}) is None
+    assert main.validate_lookup_output({**good, "note": 123}) is not None
 
 
 def test_rate_limit_stale_cleanup():

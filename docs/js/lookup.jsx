@@ -72,6 +72,9 @@ function LookupPanel({ pal, stage, onClose }) {
         <button onClick={go} disabled={loading} style={{ border: "none", background: pal.accent, color: pal.onAccent, borderRadius: 12, padding: "9px 16px", fontFamily: baseFont, fontWeight: 800, cursor: "pointer", opacity: loading ? 0.6 : 1, whiteSpace: "nowrap" }}>{loading ? "查…" : "查"}</button>
       </div>
       {err && <div style={{ marginTop: 8, fontSize: 13, color: pal.deep, fontWeight: 700 }}>{err}</div>}
+      {res && res.note && res.note.trim() && (
+        <div style={{ marginTop: 10, background: pal.soft, color: pal.deep, borderRadius: 12, padding: "8px 12px", fontSize: 13.5, fontWeight: 700, lineHeight: 1.6 }}>小精靈幫你看了一下：{res.note}</div>
+      )}
       {res && (
         <div style={{ display: "flex", gap: 16, marginTop: 14, flexWrap: "wrap", alignItems: "flex-start" }}>
           <StrokeBox char={res.char} pal={pal} />
