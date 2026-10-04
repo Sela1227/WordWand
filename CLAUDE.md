@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.16.0
+- **版本:** V0.17.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** AI 作文練習小幫手,主打國小、可切國中/高中;六~七種寫作模式 + 三精靈 + 分齡安全;英文品牌 WordWand、中文名作文魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -185,6 +185,8 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 | V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
 | V0.8.0 | 加學段切換(國小/國中/高中,預設國小):紅線全齡通用、題材/用字隨學段放寬、「只做寫作練習」scope 全齡不變;國中/高中多開「議論小教練」;模式依學段過濾顯示 |
+| V0.17.0 | 寫作計畫板每段「加一個點子」加語音輸入(麥克風,zh-TW;全域 SpeechRecCtor,SectionBlock 內 toggleMic);iOS Safari 一樣受限(見坑 #3) |
+| V0.16.1 | 分頁改層級:寫作計畫板獨立成放大的「主要」按鈕(含副標),其餘成「寫作小幫手」次要分頁(helperModes,成語變身術 sort 到最後) |
 | V0.16.0 | 寫作計畫板加「第一步・先想靈感泡泡」:填題目後一鍵用 ideas 模式產生點子池,每個點子可按 開頭/經過/結尾 分到段落(加入即從池中移除)=組織練習 |
 | V0.15.0 | 新增「寫作計畫板」(預設分頁):固定開頭/經過/結尾,每段可加多個點子;每段「請精靈幫這段」可選魔法(靈感/長大樹/五感/健身房/成語)跑 /magic、一鍵加入;localStorage 存一份 + 清空 + 複製整份。特殊互動模式,mode=board 時渲染 Board 取代雙欄 |
 | V0.14.1 | 桌機改橫式雙欄:寬螢幕(≥900px)左欄輸入、右欄結果並排(shell 加寬到 940),空狀態右欄顯示提示;手機維持上下堆疊。全走 ww-body/ww-col-left/ww-col-right + media query |
