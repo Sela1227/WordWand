@@ -7,7 +7,7 @@
 
 const { useState, useRef, useEffect } = React;
 
-const VERSION = "V1.0.1";
+const VERSION = "V1.2.0";
 
 /* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";
@@ -123,8 +123,8 @@ const MODES = {
     examples:["我走進了廚房。","外面開始下雨了。","媽媽煮了一鍋湯。"] },
   argue: { key:"argue", title:"議論小教練", titleFormal:"議論練習", btn:"想論點!", inputLabel:"輸入議題或你的看法:",
     blurb:"寫議論文時,給小教練一個議題,它會陪你想幾個論點和舉例方向,記得也想想反方,論述更周全!",
-    placeholder:"AI 對中學生的影響", itemLabels:{meaning:"怎麼舉例"},
-    resultHint:"這些論點挑你認同的,記得也想想反方說法:",
+    placeholder:"AI 對中學生的影響", itemLabels:{meaning:"怎麼說理"},
+    resultHint:"挑你認同的論點;『反方』那一條,想想你會怎麼回應:",
     stages:["jh","sh"],
     examples:["手機該不該帶到學校","網路購物的好與壞","該不該保留紙本書"] },
 };

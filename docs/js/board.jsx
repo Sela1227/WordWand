@@ -171,7 +171,8 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
     if (!t) { setPoolErr("先填上面的題目，再來想靈感喔！"); return; }
     if (t.length > MAX_CHARS) { setPoolErr(lenMsg(t.length)); return; }
     setPoolLoading(true); setPoolErr("");
-    const r = await apiPost("/magic", { spirit: spiritKey, mode: "ideas", stage, theme, text: t });
+    const context = pool.length ? `已給過的泡泡（這一批角度要全部換新）:${pool.join("｜")}` : "";
+    const r = await apiPost("/magic", { spirit: spiritKey, mode: "ideas", stage, theme, text: t, context });
     if (!r.ok) setPoolErr(r.message);
     else if (r.data.ok === false) setPoolErr(r.data.redirect || "換個題目再試試看！");
     else setPool(boardResultLines(r.data));
