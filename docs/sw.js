@@ -1,7 +1,7 @@
 /* WordWand 作文魔法屋 Service Worker
    快取名稱帶版本：每次發版本請同步改 CACHE，舊快取會在 activate 時清掉。
    原則：後端 API（/magic、/read-image，跨網域）一律走網路、絕不快取。 */
-const CACHE = "wordwand-v0.18.0";
+const CACHE = "wordwand-v0.18.2";
 
 // 預先快取的「殼層」：能離線打開畫面（功能仍需連線）
 const SHELL = [

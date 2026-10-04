@@ -68,7 +68,7 @@
 <script type="text/babel">
 const { useState, useRef, useEffect } = React;
 
-const VERSION = "V0.18.0";
+const VERSION = "V0.18.2";
 
 /* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";
@@ -463,6 +463,15 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
           </div>
         )}
 
+        <div style={S.switchRow}>
+          <span style={S.switcherLabel}>精靈</span>
+          {Object.entries(SPIRITS).map(([k,s])=>{ const on=k===spiritKey; return (
+            <button key={k} onClick={()=>setSpiritKey(k)} style={{...S.spiritChip, borderColor:on?pal.accent:pal.border, background:on?pal.soft:pal.surface, color:on?pal.deep:pal.muted}}>
+              <Spirit variant={variant} type={k} color={pal.cute ? s.color : pal.accent} pal={pal} size={26} animate={false} />{skin[k].name}
+            </button>
+          );})}
+        </div>
+
         <button onClick={()=>{setMode("board");resetOutputs();}}
           style={{ width:"100%", display:"flex", flexDirection:"column", alignItems:"flex-start", gap:2, border:"2px solid "+pal.accent, borderRadius:18, padding:"13px 18px", fontFamily:baseFont, cursor:"pointer", marginBottom:14, background: mode==="board"?pal.accent:pal.surface, color: mode==="board"?pal.onAccent:pal.deep, boxShadow: mode==="board"?pal.shadow:"none" }}>
           <span style={{fontWeight:900, fontSize:18}}>寫作計畫板</span>
@@ -488,15 +497,6 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
             </div>
           </div>
           <div style={{...S.heroQuote, color:pal.deep}}>「{spiritInfo.intro}」</div>
-        </div>
-
-        <div style={S.switchRow}>
-          <span style={S.switcherLabel}>切換教練</span>
-          {Object.entries(SPIRITS).map(([k,s])=>{ const on=k===spiritKey; return (
-            <button key={k} onClick={()=>setSpiritKey(k)} style={{...S.spiritChip, borderColor:on?pal.accent:pal.border, background:on?pal.soft:pal.surface, color:on?pal.deep:pal.muted}}>
-              <Spirit variant={variant} type={k} color={pal.cute ? s.color : pal.accent} pal={pal} size={26} animate={false} />{skin[k].name}
-            </button>
-          );})}
         </div>
 
         <div style={S.blurbCard}>
@@ -627,6 +627,29 @@ function boardResultLines(r) {
   return out;
 }
 
+function MicButton({ value, setValue, pal }) {
+  const [listening, setListening] = useState(false);
+  const recRef = useRef(null);
+  if (!SpeechRecCtor) return null;
+  function toggle() {
+    if (listening) { try { recRef.current && recRef.current.stop(); } catch (_) {} return; }
+    const rec = new SpeechRecCtor();
+    rec.lang = "zh-TW"; rec.interimResults = true; rec.continuous = false;
+    const base = value ? value + " " : "";
+    rec.onstart = () => setListening(true);
+    rec.onresult = (e) => { let s = ""; for (let i = 0; i < e.results.length; i++) s += e.results[i][0].transcript; setValue(base + s); };
+    rec.onerror = () => setListening(false);
+    rec.onend = () => setListening(false);
+    recRef.current = rec;
+    try { rec.start(); } catch (_) { setListening(false); }
+  }
+  return (
+    <button onClick={toggle} title="用說的" style={{ border: "2px solid " + pal.accent, background: listening ? pal.accent : pal.surface, color: listening ? pal.onAccent : pal.deep, borderRadius: 12, padding: "0 12px", cursor: "pointer", display: "flex", alignItems: "center", flexShrink: 0, animation: listening ? "pulse 1.2s ease-in-out infinite" : "none" }}>
+      <MicIcon color={listening ? pal.onAccent : pal.deep} />
+    </button>
+  );
+}
+
 function SectionBlock({ sec, items, onAdd, onDel, pal, stage, spiritKey, theme, isMid }) {
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState(false);
@@ -635,23 +658,7 @@ function SectionBlock({ sec, items, onAdd, onDel, pal, stage, spiritKey, theme, 
   const [hloading, setHloading] = useState(false);
   const [hres, setHres] = useState(null);
   const [herr, setHerr] = useState("");
-  const [listening, setListening] = useState(false);
-  const recRef = useRef(null);
   const name = (k) => isMid ? (MODES[k].titleFormal || MODES[k].title) : MODES[k].title;
-
-  function toggleMic() {
-    if (!SpeechRecCtor) return;
-    if (listening) { try { recRef.current && recRef.current.stop(); } catch (_) {} return; }
-    const rec = new SpeechRecCtor();
-    rec.lang = "zh-TW"; rec.interimResults = true; rec.continuous = false;
-    const base = draft ? draft + " " : "";
-    rec.onstart = () => setListening(true);
-    rec.onresult = (e) => { let s = ""; for (let i = 0; i < e.results.length; i++) s += e.results[i][0].transcript; setDraft(base + s); };
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
-    recRef.current = rec;
-    try { rec.start(); } catch (_) { setListening(false); }
-  }
 
   async function run() {
     const t = hinput.trim();
@@ -684,11 +691,7 @@ function SectionBlock({ sec, items, onAdd, onDel, pal, stage, spiritKey, theme, 
       ))}
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
         <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { onAdd(draft); setDraft(""); } }} placeholder="加一個點子…" style={miniInput} />
-        {SpeechRecCtor && (
-          <button onClick={toggleMic} title="用說的" style={{ border: "2px solid " + pal.accent, background: listening ? pal.accent : pal.surface, color: listening ? pal.onAccent : pal.deep, borderRadius: 12, padding: "0 12px", cursor: "pointer", display: "flex", alignItems: "center", animation: listening ? "pulse 1.2s ease-in-out infinite" : "none" }}>
-            <MicIcon color={listening ? pal.onAccent : pal.deep} />
-          </button>
-        )}
+        <MicButton value={draft} setValue={setDraft} pal={pal} />
         <button onClick={() => { onAdd(draft); setDraft(""); }} style={{ border: "none", background: pal.accent, color: pal.onAccent, borderRadius: 12, padding: "9px 15px", fontFamily: baseFont, fontWeight: 800, fontSize: 16, cursor: "pointer" }}>＋</button>
       </div>
       <button onClick={() => setOpen((o) => !o)} style={{ marginTop: 10, border: "2px dashed " + pal.border, background: "transparent", color: pal.deep, borderRadius: 12, padding: "8px 12px", fontFamily: baseFont, fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}>{open ? "收起精靈幫手" : "✦ 請精靈幫這段"}</button>
@@ -700,6 +703,7 @@ function SectionBlock({ sec, items, onAdd, onDel, pal, stage, spiritKey, theme, 
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <input value={hinput} onChange={(e) => setHinput(e.target.value)} placeholder="要幫忙的題目或句子…" style={miniInput} />
+            <MicButton value={hinput} setValue={setHinput} pal={pal} />
             <button onClick={run} disabled={hloading} style={{ border: "none", background: pal.accent, color: pal.onAccent, borderRadius: 12, padding: "9px 15px", fontFamily: baseFont, fontWeight: 800, cursor: "pointer", opacity: hloading ? 0.6 : 1, whiteSpace: "nowrap" }}>{hloading ? "…" : "試試看"}</button>
           </div>
           {herr && <div style={{ marginTop: 8, fontSize: 13, color: pal.deep, fontWeight: 700 }}>{herr}</div>}
@@ -769,7 +773,7 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
     setTimeout(() => setMsg(""), 2500);
   }
 
-  const topInput = { width: "100%", border: "2px solid " + pal.border, borderRadius: 14, padding: "12px 14px", fontFamily: baseFont, fontSize: 17, fontWeight: 700, color: pal.deep, background: pal.surface };
+  const topInput = { flex: 1, minWidth: 0, border: "2px solid " + pal.border, borderRadius: 14, padding: "12px 14px", fontFamily: baseFont, fontSize: 17, fontWeight: 700, color: pal.deep, background: pal.surface };
 
   return (
     <div>
@@ -778,7 +782,10 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
         <div style={{ fontSize: 13, color: pal.muted, lineHeight: 1.6 }}>先填題目,把想到的點子記進開頭/經過/結尾;卡住就點「請精靈幫這段」。內容會自動存在這台電腦。</div>
       </div>
       <div style={{ marginBottom: 6, fontSize: 13.5, fontWeight: 700, color: pal.deep }}>作文題目</div>
-      <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="例如:我的假日生活" style={topInput} />
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="例如:我的假日生活" style={topInput} />
+        <MicButton value={topic} setValue={setTopic} pal={pal} />
+      </div>
 
       <div style={{ background: pal.surface, border: "2px dashed " + pal.accent, borderRadius: 18, padding: 14, margin: "14px 0" }}>
         <div style={{ fontWeight: 900, fontSize: 15, color: pal.deep, marginBottom: 4 }}>第一步・先想靈感泡泡</div>
