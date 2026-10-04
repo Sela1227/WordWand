@@ -68,7 +68,7 @@
 <script type="text/babel">
 const { useState, useRef, useEffect } = React;
 
-const VERSION = "V0.14.1";
+const VERSION = "V0.15.0";
 
 /* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";
@@ -125,6 +125,7 @@ const MID_THEME_LIST = [
 ];
 
 const MODES = {
+  board: { key:"board", title:"寫作計畫板", titleFormal:"寫作計畫板" },
   ideas: { key:"ideas", title:"靈感泡泡", titleFormal:"靈感發想", btn:"給我點子!", inputLabel:"輸入一個主題詞:",
     blurb:"不知道要寫什麼嗎?給一個主題,小精靈會從不同角度幫你打開思路!",
     placeholder:"我的學校", itemLabels:{meaning:"想想看"},
@@ -300,7 +301,7 @@ function Gate({ onEnter }) {
 /* ---------- 主工具 ---------- */
 function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
   const [spiritKey, setSpiritKey] = useState("nini");
-  const [mode, setMode] = useState("ideas");
+  const [mode, setMode] = useState("board");
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -466,7 +467,7 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
           );})}
         </div>
 
-        <div className="ww-body">
+        {mode==="board" ? (<Board pal={pal} stage={stage} spiritKey={spiritKey} theme={variant} isMid={isMid} />) : (<div className="ww-body">
         <div className="ww-col-left">
         <div style={{...S.heroCard, background:pal.soft}}>
           {pal.cute && (<><Sparkle top={14} left={"18%"} size={14} delay={0} /><Sparkle top={30} left={"82%"} size={18} delay={0.7} /><Sparkle top={86} left={"8%"} size={12} delay={1.3} /></>)}
@@ -596,10 +597,148 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
           </div>
         )}
         </div>
-        </div>
+        </div>)}
 
         <div style={S.foot}>WordWand　·　作文魔法屋　·　{VERSION}</div>
       </div>
+    </div>
+  );
+}
+
+const BOARD_SECTIONS = ["開頭", "經過", "結尾"];
+const BOARD_HELPERS = ["ideas", "grow", "senses", "gym", "idiom"];
+const BOARD_LS_KEY = "wordwand_board_v1";
+
+function boardResultLines(r) {
+  const out = [];
+  if (!r) return out;
+  if (r.upgraded) out.push(r.upgraded);
+  if (Array.isArray(r.items)) r.items.forEach((it) => { if (it && it.word) out.push(it.why ? (it.word + "：" + it.meaning + "（" + it.why + "）") : (it.word + "：" + it.meaning)); });
+  if (Array.isArray(r.questions)) r.questions.forEach((q) => out.push(q));
+  return out;
+}
+
+function SectionBlock({ sec, items, onAdd, onDel, pal, stage, spiritKey, theme, isMid }) {
+  const [draft, setDraft] = useState("");
+  const [open, setOpen] = useState(false);
+  const [hmode, setHmode] = useState("ideas");
+  const [hinput, setHinput] = useState("");
+  const [hloading, setHloading] = useState(false);
+  const [hres, setHres] = useState(null);
+  const [herr, setHerr] = useState("");
+  const name = (k) => isMid ? (MODES[k].titleFormal || MODES[k].title) : MODES[k].title;
+
+  async function run() {
+    const t = hinput.trim();
+    if (!t) { setHerr("先在上面輸入要幫忙的題目或句子喔!"); return; }
+    setHloading(true); setHres(null); setHerr("");
+    try {
+      const res = await fetch(`${BACKEND_URL}/magic`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spirit: spiritKey, mode: hmode, stage, theme, text: t }) });
+      if (!res.ok) throw new Error("bad");
+      const d = await res.json();
+      if (d.ok === false) setHerr(d.redirect || "換個題目或句子再試試看!");
+      else setHres(d);
+    } catch (_) { setHerr("小精靈累了,等一下再試!"); }
+    finally { setHloading(false); }
+  }
+
+  const box = { background: pal.surface, border: "2px solid " + pal.border, borderRadius: 18, padding: 14, marginBottom: 14 };
+  const chip = (on) => ({ border: "2px solid " + (on ? pal.accent : pal.border), background: on ? pal.accent : pal.surface, color: on ? pal.onAccent : pal.muted, borderRadius: 999, padding: "6px 12px", fontFamily: baseFont, fontWeight: 700, fontSize: 12.5, cursor: "pointer" });
+  const miniInput = { flex: 1, minWidth: 0, border: "2px solid " + pal.border, borderRadius: 12, padding: "9px 11px", fontFamily: baseFont, fontSize: 16, color: pal.deep, background: pal.surface };
+
+  return (
+    <div style={box}>
+      <div style={{ fontWeight: 900, fontSize: 16, color: pal.deep, marginBottom: 8 }}>{sec}</div>
+      {items.length === 0 && <div style={{ fontSize: 13, color: pal.muted, marginBottom: 8 }}>還沒有點子。在下面加,或請精靈幫你想。</div>}
+      {items.map((it, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: pal.soft, borderRadius: 12, padding: "8px 10px", marginBottom: 6 }}>
+          <span style={{ flex: 1, fontSize: 14.5, lineHeight: 1.6, color: pal.deep }}>{it}</span>
+          <button onClick={() => onDel(i)} title="刪除" style={{ border: "none", background: "transparent", color: pal.muted, cursor: "pointer", fontSize: 16, fontWeight: 900, lineHeight: 1 }}>✕</button>
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { onAdd(draft); setDraft(""); } }} placeholder="加一個點子…" style={miniInput} />
+        <button onClick={() => { onAdd(draft); setDraft(""); }} style={{ border: "none", background: pal.accent, color: pal.onAccent, borderRadius: 12, padding: "9px 15px", fontFamily: baseFont, fontWeight: 800, fontSize: 16, cursor: "pointer" }}>＋</button>
+      </div>
+      <button onClick={() => setOpen((o) => !o)} style={{ marginTop: 10, border: "2px dashed " + pal.border, background: "transparent", color: pal.deep, borderRadius: 12, padding: "8px 12px", fontFamily: baseFont, fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}>{open ? "收起精靈幫手" : "✦ 請精靈幫這段"}</button>
+      {open && (
+        <div style={{ marginTop: 10, padding: 12, borderRadius: 14, background: pal.soft }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: pal.muted, marginBottom: 6 }}>選一種魔法:</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            {BOARD_HELPERS.map((k) => (<button key={k} onClick={() => setHmode(k)} style={chip(hmode === k)}>{name(k)}</button>))}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input value={hinput} onChange={(e) => setHinput(e.target.value)} placeholder="要幫忙的題目或句子…" style={miniInput} />
+            <button onClick={run} disabled={hloading} style={{ border: "none", background: pal.accent, color: pal.onAccent, borderRadius: 12, padding: "9px 15px", fontFamily: baseFont, fontWeight: 800, cursor: "pointer", opacity: hloading ? 0.6 : 1, whiteSpace: "nowrap" }}>{hloading ? "…" : "試試看"}</button>
+          </div>
+          {herr && <div style={{ marginTop: 8, fontSize: 13, color: pal.deep, fontWeight: 700 }}>{herr}</div>}
+          {hres && boardResultLines(hres).map((line, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: pal.surface, borderRadius: 12, padding: "8px 10px", marginTop: 6 }}>
+              <span style={{ flex: 1, fontSize: 14, lineHeight: 1.6, color: pal.deep }}>{line}</span>
+              <button onClick={() => onAdd(line)} style={{ border: "2px solid " + pal.accent, background: "transparent", color: pal.deep, borderRadius: 999, padding: "3px 10px", fontFamily: baseFont, fontWeight: 700, fontSize: 12.5, cursor: "pointer", whiteSpace: "nowrap" }}>＋加入</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Board({ pal, stage, spiritKey, theme, isMid }) {
+  const [topic, setTopic] = useState("");
+  const [sections, setSections] = useState({ "開頭": [], "經過": [], "結尾": [] });
+  const [loaded, setLoaded] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(BOARD_LS_KEY);
+      if (raw) { const d = JSON.parse(raw); setTopic(d.topic || ""); setSections({ "開頭": (d.sections && d.sections["開頭"]) || [], "經過": (d.sections && d.sections["經過"]) || [], "結尾": (d.sections && d.sections["結尾"]) || [] }); }
+    } catch (_) {}
+    setLoaded(true);
+  }, []);
+  useEffect(() => { if (!loaded) return; try { localStorage.setItem(BOARD_LS_KEY, JSON.stringify({ topic, sections })); } catch (_) {} }, [topic, sections, loaded]);
+
+  const add = (sec, txt) => { txt = (txt || "").trim(); if (!txt) return; setSections((s) => ({ ...s, [sec]: [...s[sec], txt] })); };
+  const del = (sec, i) => setSections((s) => ({ ...s, [sec]: s[sec].filter((_, j) => j !== i) }));
+
+  function clearAll() {
+    if (window.confirm("確定要清空整份計畫嗎?清掉就回不來囉!")) {
+      setTopic(""); setSections({ "開頭": [], "經過": [], "結尾": [] });
+      setMsg("已清空,可以重新開始!"); setTimeout(() => setMsg(""), 2000);
+    }
+  }
+  function copyAll() {
+    const lines = ["題目:" + (topic || "(還沒填)")];
+    BOARD_SECTIONS.forEach((sec) => { lines.push(""); lines.push("【" + sec + "】"); (sections[sec] || []).forEach((it) => lines.push("・" + it)); });
+    const txt = lines.join("\n");
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt);
+      else { const t = document.createElement("textarea"); t.value = txt; t.style.position = "fixed"; t.style.opacity = "0"; document.body.appendChild(t); t.select(); document.execCommand("copy"); document.body.removeChild(t); }
+      setMsg("已複製整份計畫!貼到哪裡都可以照著寫。");
+    } catch (_) { setMsg("複製失敗,手動選取一下也可以!"); }
+    setTimeout(() => setMsg(""), 2500);
+  }
+
+  const topInput = { width: "100%", border: "2px solid " + pal.border, borderRadius: 14, padding: "12px 14px", fontFamily: baseFont, fontSize: 17, fontWeight: 700, color: pal.deep, background: pal.surface };
+
+  return (
+    <div>
+      <div style={{ background: pal.soft, borderRadius: 18, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontWeight: 900, fontSize: 15, color: pal.deep, marginBottom: 4 }}>我的寫作計畫板</div>
+        <div style={{ fontSize: 13, color: pal.muted, lineHeight: 1.6 }}>先填題目,把想到的點子記進開頭/經過/結尾;卡住就點「請精靈幫這段」。內容會自動存在這台電腦。</div>
+      </div>
+      <div style={{ marginBottom: 6, fontSize: 13.5, fontWeight: 700, color: pal.deep }}>作文題目</div>
+      <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="例如:我的假日生活" style={topInput} />
+      <div style={{ height: 14 }} />
+      {BOARD_SECTIONS.map((sec) => (
+        <SectionBlock key={sec} sec={sec} items={sections[sec]} onAdd={(t) => add(sec, t)} onDel={(i) => del(sec, i)} pal={pal} stage={stage} spiritKey={spiritKey} theme={theme} isMid={isMid} />
+      ))}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+        <button onClick={copyAll} style={{ flex: 1, minWidth: 160, border: "none", background: pal.accent, color: pal.onAccent, borderRadius: 14, padding: "12px", fontFamily: baseFont, fontWeight: 800, fontSize: 15, cursor: "pointer" }}>複製整份計畫</button>
+        <button onClick={clearAll} style={{ border: "2px solid " + pal.border, background: pal.surface, color: pal.muted, borderRadius: 14, padding: "12px 16px", fontFamily: baseFont, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>清空</button>
+      </div>
+      {msg && <div style={{ marginTop: 10, fontSize: 13.5, fontWeight: 700, color: pal.deep }}>{msg}</div>}
     </div>
   );
 }
