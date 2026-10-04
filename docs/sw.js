@@ -1,7 +1,7 @@
 /* WordWand 作文魔法屋 Service Worker
    快取名稱帶版本：每次發版本請同步改 CACHE，舊快取會在 activate 時清掉。
    原則：後端 API（/magic、/read-image，跨網域）一律走網路、絕不快取。 */
-const CACHE = "wordwand-v0.19.0";
+const CACHE = "wordwand-v0.20.0";
 
 // 預先快取的「殼層」：能離線打開畫面（功能仍需連線）
 const SHELL = [
@@ -12,13 +12,14 @@ const SHELL = [
   "./icon-192.png",
   "./icon-512.png",
   "./apple-touch-icon.png",
-  "https://unpkg.com/react@18/umd/react.production.min.js",
-  "https://unpkg.com/react-dom@18/umd/react-dom.production.min.js",
-  "https://unpkg.com/@babel/standalone/babel.min.js",
+  "https://unpkg.com/react@18.3.1/umd/react.production.min.js",
+  "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js",
+  "https://unpkg.com/@babel/standalone@7.29.9/babel.min.js",
+  "https://cdn.jsdelivr.net/npm/hanzi-writer@3.7.3/dist/hanzi-writer.min.js",
 ];
 
 // 允許快取的 CDN 來源（殼層要用到）
-const CDN_HOSTS = ["unpkg.com", "fonts.googleapis.com", "fonts.gstatic.com"];
+const CDN_HOSTS = ["unpkg.com", "cdn.jsdelivr.net", "fonts.googleapis.com", "fonts.gstatic.com"];  // jsdelivr:hanzi-writer 與筆順字資料
 
 self.addEventListener("install", (e) => {
   e.waitUntil(

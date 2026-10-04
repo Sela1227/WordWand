@@ -14,9 +14,10 @@
 <meta name="apple-mobile-web-app-title" content="作文魔法屋" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.9/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.7.3/dist/hanzi-writer.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -68,11 +69,37 @@
 <script type="text/babel">
 const { useState, useRef, useEffect } = React;
 
-const VERSION = "V0.19.0";
+const VERSION = "V0.20.0";
 
 /* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";
 const SpeechRecCtor = (typeof window !== "undefined") && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+/* 共用輸入規則與請求（審核 P1-1 / P2-2 / P2-4）：
+   - MAX_CHARS 與後端一致（200）
+   - apiPost 回 {ok:true,data} 或 {ok:false,message}；訊息依狀態碼區分、可採取行動 */
+const MAX_CHARS = 200;
+function lenMsg(n) {
+  if (n > MAX_CHARS) return `超過 ${MAX_CHARS} 字了（目前 ${n} 字），刪到 ${MAX_CHARS} 字內再送出喔！`;
+  if (n > MAX_CHARS - 20) return `快到上限了（${n} / ${MAX_CHARS}）`;
+  return "";
+}
+async function apiPost(path, body) {
+  if (BACKEND_URL.includes("YOUR-APP")) return { ok: false, message: "還沒設定後端網址喔！" };
+  let res;
+  try {
+    res = await fetch(`${BACKEND_URL}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  } catch (_) {
+    return { ok: false, message: "連不上小精靈。檢查一下網路，再試一次！" };
+  }
+  let data = null;
+  try { data = await res.json(); } catch (_) {}
+  if (res.ok) return { ok: true, data };
+  const detail = data && typeof data.detail === "string" ? data.detail : "";
+  if (res.status === 429) return { ok: false, message: detail || "太多人同時在用，請等大約一分鐘再試！" };
+  if (res.status === 400) return { ok: false, message: detail || "輸入有點問題，檢查一下再送出！" };
+  return { ok: false, message: detail ? `小精靈暫時休息中：${detail}` : "小精靈暫時休息中，等一下再試一次！" };
+}
 /* ★ 中學通行碼(前端簡易鎖,非資安防線;真正保護在後端紅線)。改這裡即可。 */
 const MID_PASSWORD = "1234";
 
@@ -316,6 +343,7 @@ function chooseZhVoice() {
 function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
   const [spiritKey, setSpiritKey] = useState("nini");
   const [mode, setMode] = useState("board");
+  const [showLookup, setShowLookup] = useState(false);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -376,26 +404,25 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
     setPhotoLoading(true); setInputMsg("讀照片中…");
     try {
       const b64 = await fileToBase64(file);
-      const res = await fetch(`${BACKEND_URL}/read-image`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ image_base64:b64, media_type:file.type||"image/jpeg" }) });
-      if (!res.ok) throw new Error("bad");
-      const data = await res.json();
-      if (data.text && data.text.trim()) { setText(data.text.trim()); setInputMsg("讀好了!看看對不對,可以改一改再送出。"); }
-      else { setInputMsg("看不太清楚,拍清楚一點再試,或直接打字吧!"); }
-    } catch(_) { setInputMsg("照片讀取失敗,再試一次或直接打字吧!"); }
+      const r = await apiPost("/read-image", { image_base64:b64, media_type:file.type||"image/jpeg" });
+      if (!r.ok) { setInputMsg(r.message); return; }
+      const t = (r.data && r.data.text || "").trim();
+      if (!t) { setInputMsg("看不太清楚。靠近一點、避免反光、一次拍一小段再試！"); return; }
+      setText(t);
+      if (t.length > MAX_CHARS) setInputMsg(`照片讀到比較長的內容（${t.length} 字）。請留下想練習的一小段（${MAX_CHARS} 字內）再送出。`);
+      else setInputMsg("讀好了！看看對不對，可以改一改再送出。");
+    } catch(_) { setInputMsg("照片讀取失敗，再試一次或直接打字吧！"); }
     finally { setPhotoLoading(false); }
   }
 
   async function castMagic() {
     const input = text.trim();
     if (!input || loading) return;
-    if (BACKEND_URL.includes("YOUR-APP")) { setError("還沒設定後端網址喔!"); return; }
+    if (input.length > MAX_CHARS) { setError(lenMsg(input.length)); return; }
     setLoading(true); setResult(null); setError(""); stopSpeak(); setCopyMsg("");
-    try {
-      const res = await fetch(`${BACKEND_URL}/magic`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ spirit:spiritKey, mode, stage, theme:variant, text:input }) });
-      if (!res.ok) throw new Error("bad");
-      setResult(await res.json());
-    } catch(_) { setError("小精靈的魔法棒打了一個盹,再按一次試試看吧!"); }
-    finally { setLoading(false); }
+    const r = await apiPost("/magic", { spirit:spiritKey, mode, stage, theme:variant, text:input });
+    if (r.ok) setResult(r.data); else setError(r.message);
+    setLoading(false);
   }
 
   function buildExportText(r) {
@@ -443,7 +470,14 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
     <div style={S.root}>
       <div className="ww-shell" style={S.shell}>
         <div style={S.topBar}>
-          <button style={S.exitBtn} onClick={()=>{stopSpeak();onExit();}}>← 換身分</button>
+          <button style={S.exitBtn} onClick={()=>{
+            stopSpeak();
+            if (boardHasAnyContent()) {
+              const keep = window.confirm("這台裝置上還留著一份寫作計畫。\n\n按「確定」= 保留給下次使用\n按「取消」= 清除後再換身分（下一位使用者不會看到）");
+              if (!keep) clearAllBoards();
+            }
+            onExit();
+          }}>← 換身分</button>
           {isMid && (
             <div style={S.switcher}>
               <span style={S.switcherLabel}>年級</span>
@@ -452,8 +486,8 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
               );})}
             </div>
           )}
+          <button onClick={()=>setShowLookup(v=>!v)} style={{ marginLeft:"auto", border:"2px solid "+pal.accent, background: showLookup?pal.accent:pal.surface, color: showLookup?pal.onAccent:pal.deep, borderRadius:999, padding:"5px 14px", fontFamily:baseFont, fontWeight:800, fontSize:13, cursor:"pointer" }}>{showLookup?"關閉查字":"查字"}</button>
         </div>
-
         {isMid && (
           <div style={S.switcher}>
             <span style={S.switcherLabel}>風格</span>
@@ -462,6 +496,8 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
             );})}
           </div>
         )}
+
+        {showLookup && <LookupPanel pal={pal} stage={stage} onClose={()=>setShowLookup(false)} />}
 
         <div style={S.switchRow}>
           <span style={S.switcherLabel}>精靈</span>
@@ -506,6 +542,10 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
 
         <div style={S.inputLabel}>{cfg.inputLabel || "輸入你想練習的句子:"}</div>
         <textarea value={text} onChange={(e)=>setText(e.target.value)} placeholder={cfg.placeholder} rows={3} style={S.textarea} />
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", margin:"4px 4px 0", fontSize:12.5, fontWeight:700}}>
+          <span style={{color: text.length>MAX_CHARS ? "#D9534F" : pal.muted}}>{lenMsg(text.length)}</span>
+          <span style={{color: text.length>MAX_CHARS ? "#D9534F" : pal.muted}}>{text.length} / {MAX_CHARS}</span>
+        </div>
 
         {mode==="argue" && ISSUE_TOPICS[stage] && (
           <div style={{marginTop:10}}>
@@ -535,7 +575,7 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
           {cfg.examples.map((ex,i)=>(<button key={i} style={S.exChip} onClick={()=>setText(ex)}>{ex.length>12?ex.slice(0,12)+"…":ex}</button>))}
         </div>
 
-        <button onClick={castMagic} disabled={loading||!text.trim()} style={{...S.castBtn, background:pal.accent, color:pal.onAccent, opacity:(loading||!text.trim())?0.55:1, cursor:(loading||!text.trim())?"default":"pointer"}}>
+        <button onClick={castMagic} disabled={loading||!text.trim()||text.length>MAX_CHARS} style={{...S.castBtn, background:pal.accent, color:pal.onAccent, opacity:(loading||!text.trim()||text.length>MAX_CHARS)?0.55:1, cursor:(loading||!text.trim()||text.length>MAX_CHARS)?"default":"pointer"}}>
           {loading ? "施展魔法中…" : (cfg.btn || "變身!")}
         </button>
         </div>
@@ -616,7 +656,27 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
 
 const BOARD_SECTIONS = ["開頭", "經過", "結尾"];
 const BOARD_HELPERS = ["ideas", "grow", "senses", "gym", "idiom"];
-const BOARD_LS_KEY = "wordwand_board_v1";
+const BOARD_LS_PREFIX = "wordwand_board_v2_";
+const boardKey = (stage) => BOARD_LS_PREFIX + stage;
+function boardHasAnyContent() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(BOARD_LS_PREFIX)) continue;
+      const d = JSON.parse(localStorage.getItem(k) || "{}");
+      if ((d.topic || "").trim()) return true;
+      if (d.sections && Object.values(d.sections).some((arr) => Array.isArray(arr) && arr.length)) return true;
+    }
+  } catch (_) {}
+  return false;
+}
+function clearAllBoards() {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(BOARD_LS_PREFIX)) keys.push(k); }
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch (_) {}
+}
 
 function boardResultLines(r) {
   const out = [];
@@ -650,7 +710,7 @@ function MicButton({ value, setValue, pal }) {
   );
 }
 
-function SectionBlock({ sec, items, onAdd, onDel, pal, stage, spiritKey, theme, isMid }) {
+function SectionBlock({ sec, items, onAdd, onDel, pal, stage, spiritKey, theme, isMid, topic }) {
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState(false);
   const [hmode, setHmode] = useState("ideas");
@@ -662,16 +722,15 @@ function SectionBlock({ sec, items, onAdd, onDel, pal, stage, spiritKey, theme, 
 
   async function run() {
     const t = hinput.trim();
-    if (!t) { setHerr("先在上面輸入要幫忙的題目或句子喔!"); return; }
+    if (!t) { setHerr("先在上面輸入要幫忙的題目或句子喔！"); return; }
+    if (t.length > MAX_CHARS) { setHerr(lenMsg(t.length)); return; }
     setHloading(true); setHres(null); setHerr("");
-    try {
-      const res = await fetch(`${BACKEND_URL}/magic`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spirit: spiritKey, mode: hmode, stage, theme, text: t }) });
-      if (!res.ok) throw new Error("bad");
-      const d = await res.json();
-      if (d.ok === false) setHerr(d.redirect || "換個題目或句子再試試看!");
-      else setHres(d);
-    } catch (_) { setHerr("小精靈累了,等一下再試!"); }
-    finally { setHloading(false); }
+    const context = `題目:${(topic || "").trim() || "(未填)"};段落:${sec};這段已有點子:${items.length ? items.join("、") : "(無)"}`;
+    const r = await apiPost("/magic", { spirit: spiritKey, mode: hmode, stage, theme, text: t, context });
+    if (!r.ok) setHerr(r.message);
+    else if (r.data.ok === false) setHerr(r.data.redirect || "換個題目或句子再試試看！");
+    else setHres(r.data);
+    setHloading(false);
   }
 
   const box = { background: pal.surface, border: "2px solid " + pal.border, borderRadius: 18, padding: 14, marginBottom: 14 };
@@ -732,28 +791,41 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(BOARD_LS_KEY);
+      const raw = localStorage.getItem(boardKey(stage));
       if (raw) { const d = JSON.parse(raw); setTopic(d.topic || ""); setSections({ "開頭": (d.sections && d.sections["開頭"]) || [], "經過": (d.sections && d.sections["經過"]) || [], "結尾": (d.sections && d.sections["結尾"]) || [] }); }
+      else { setTopic(""); setSections({ "開頭": [], "經過": [], "結尾": [] }); }
     } catch (_) {}
+    setPool([]); setView("edit");
     setLoaded(true);
-  }, []);
-  useEffect(() => { if (!loaded) return; try { localStorage.setItem(BOARD_LS_KEY, JSON.stringify({ topic, sections })); } catch (_) {} }, [topic, sections, loaded]);
+  }, [stage]);
+  useEffect(() => { if (!loaded) return; try { localStorage.setItem(boardKey(stage), JSON.stringify({ topic, sections })); } catch (_) {} }, [topic, sections, loaded, stage]);
 
   const add = (sec, txt) => { txt = (txt || "").trim(); if (!txt) return; setSections((s) => ({ ...s, [sec]: [...s[sec], txt] })); };
-  const del = (sec, i) => setSections((s) => ({ ...s, [sec]: s[sec].filter((_, j) => j !== i) }));
+  const [undo, setUndo] = useState(null);   // {sec, i, item}（審核 四-3:刪除可復原）
+  const undoTimer = useRef(null);
+  const del = (sec, i) => {
+    const item = sections[sec][i];
+    setSections((s) => ({ ...s, [sec]: s[sec].filter((_, j) => j !== i) }));
+    setUndo({ sec, i, item });
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setUndo(null), 7000);
+  };
+  const undoDelete = () => {
+    if (!undo) return;
+    setSections((s) => { const arr = [...s[undo.sec]]; arr.splice(Math.min(undo.i, arr.length), 0, undo.item); return { ...s, [undo.sec]: arr }; });
+    setUndo(null); if (undoTimer.current) clearTimeout(undoTimer.current);
+  };
 
   async function genPool() {
     const t = topic.trim();
-    if (!t) { setPoolErr("先填上面的題目,再來想靈感喔!"); return; }
+    if (!t) { setPoolErr("先填上面的題目，再來想靈感喔！"); return; }
+    if (t.length > MAX_CHARS) { setPoolErr(lenMsg(t.length)); return; }
     setPoolLoading(true); setPoolErr("");
-    try {
-      const res = await fetch(`${BACKEND_URL}/magic`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ spirit: spiritKey, mode: "ideas", stage, theme, text: t }) });
-      if (!res.ok) throw new Error("bad");
-      const d = await res.json();
-      if (d.ok === false) setPoolErr(d.redirect || "換個題目再試試看!");
-      else setPool(boardResultLines(d));
-    } catch (_) { setPoolErr("小精靈累了,等一下再試!"); }
-    finally { setPoolLoading(false); }
+    const r = await apiPost("/magic", { spirit: spiritKey, mode: "ideas", stage, theme, text: t });
+    if (!r.ok) setPoolErr(r.message);
+    else if (r.data.ok === false) setPoolErr(r.data.redirect || "換個題目再試試看！");
+    else setPool(boardResultLines(r.data));
+    setPoolLoading(false);
   }
   function addFromPool(sec, idx) { add(sec, pool[idx]); setPool((p) => p.filter((_, j) => j !== idx)); }
 
@@ -852,16 +924,16 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
     <div>
       <div style={{ background: pal.soft, borderRadius: 18, padding: 14, marginBottom: 14 }}>
         <div style={{ fontWeight: 900, fontSize: 15, color: pal.deep, marginBottom: 4 }}>我的寫作計畫板</div>
-        <div style={{ fontSize: 13, color: pal.muted, lineHeight: 1.6 }}>先填題目,把想到的點子記進開頭/經過/結尾;卡住就點「請精靈幫這段」。內容會自動存在這台電腦。</div>
+        <div style={{ fontSize: 13, color: pal.muted, lineHeight: 1.6 }}>① 訂題目 → ② 想點子 → ③ 排進開頭/經過/結尾。卡住時再用「請精靈幫這段」或「✦ 接著想」。這份計畫會暫存在目前這個瀏覽器，重要內容完成後記得複製保存。</div>
       </div>
-      <div style={{ marginBottom: 6, fontSize: 13.5, fontWeight: 700, color: pal.deep }}>作文題目</div>
+      <div style={{ marginBottom: 6, fontSize: 13.5, fontWeight: 700, color: pal.deep }}>① 訂題目</div>
       <div style={{ display: "flex", gap: 8 }}>
         <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="例如:我的假日生活" style={topInput} />
         <MicButton value={topic} setValue={setTopic} pal={pal} />
       </div>
 
       <div style={{ background: pal.surface, border: "2px dashed " + pal.accent, borderRadius: 18, padding: 14, margin: "14px 0" }}>
-        <div style={{ fontWeight: 900, fontSize: 15, color: pal.deep, marginBottom: 4 }}>第一步・先想靈感泡泡</div>
+        <div style={{ fontWeight: 900, fontSize: 15, color: pal.deep, marginBottom: 4 }}>② 想點子・先用題目吹靈感泡泡</div>
         <div style={{ fontSize: 13, color: pal.muted, lineHeight: 1.6, marginBottom: 10 }}>填好題目,先請精靈吹出一堆點子;再把每個點子分到適合的段落。</div>
         <button onClick={genPool} disabled={poolLoading} style={{ border: "none", background: pal.accent, color: pal.onAccent, borderRadius: 12, padding: "10px 16px", fontFamily: baseFont, fontWeight: 800, fontSize: 14.5, cursor: "pointer", opacity: poolLoading ? 0.6 : 1 }}>{poolLoading ? "想點子中…" : (pool.length ? "再想一批" : "用題目想靈感泡泡")}</button>
         {poolErr && <div style={{ marginTop: 8, fontSize: 13, color: pal.deep, fontWeight: 700 }}>{poolErr}</div>}
@@ -878,8 +950,9 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
         ))}
       </div>
 
+      <div style={{ fontWeight: 900, fontSize: 15, color: pal.deep, margin: "4px 2px 8px" }}>③ 排進段落・把點子放到該去的地方</div>
       {BOARD_SECTIONS.map((sec) => (
-        <SectionBlock key={sec} sec={sec} items={sections[sec]} onAdd={(t) => add(sec, t)} onDel={(i) => del(sec, i)} pal={pal} stage={stage} spiritKey={spiritKey} theme={theme} isMid={isMid} />
+        <SectionBlock key={sec} sec={sec} items={sections[sec]} onAdd={(t) => add(sec, t)} onDel={(i) => del(sec, i)} pal={pal} stage={stage} spiritKey={spiritKey} theme={theme} isMid={isMid} topic={topic} />
       ))}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
         <button onClick={() => setView("overview")} style={btnPrimary}>看整篇總覽</button>
@@ -887,6 +960,105 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
         <button onClick={clearAll} style={btnMuted}>清空</button>
       </div>
       {msg && <div style={{ marginTop: 10, fontSize: 13.5, fontWeight: 700, color: pal.deep }}>{msg}</div>}
+      {undo && (
+        <div style={{ position: "sticky", bottom: 12, marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: pal.deep, color: pal.surface, borderRadius: 14, padding: "10px 14px", boxShadow: "0 8px 22px rgba(0,0,0,0.18)" }}>
+          <span style={{ fontSize: 13.5, fontWeight: 700 }}>已刪除一個點子</span>
+          <button onClick={undoDelete} style={{ border: "2px solid " + pal.surface, background: "transparent", color: pal.surface, borderRadius: 999, padding: "4px 14px", fontFamily: baseFont, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>復原</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* 查字小幫手（審核 P2-1:做成第二層工具,不加第一層分頁）。
+   StrokeBox:田字格大字;若 HanziWriter 與字資料可用則播筆順動畫,否則退回純大字。 */
+function StrokeBox({ char, pal }) {
+  const ref = useRef(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+    const el = ref.current; if (!el) return;
+    el.innerHTML = "";
+    if (typeof window === "undefined" || !window.HanziWriter) { setFailed(true); return; }
+    try {
+      const w = window.HanziWriter.create(el, char, {
+        width: 180, height: 180, padding: 10, showOutline: true,
+        strokeColor: pal.accent, outlineColor: "#D9CBD6", radicalColor: pal.deep,
+        strokeAnimationSpeed: 1, delayBetweenStrokes: 180,
+        onLoadCharDataError: () => setFailed(true),
+      });
+      w.animateCharacter();
+      el._writer = w;
+    } catch (_) { setFailed(true); }
+  }, [char]);
+  const grid = { width: 180, height: 180, border: "2px solid " + pal.border, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+    background: `linear-gradient(to right, transparent calc(50% - 1px), ${pal.border} calc(50% - 1px), ${pal.border} calc(50% + 1px), transparent calc(50% + 1px)), linear-gradient(to bottom, transparent calc(50% - 1px), ${pal.border} calc(50% - 1px), ${pal.border} calc(50% + 1px), transparent calc(50% + 1px)), ${pal.surface}` };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+      <div style={grid}>
+        {failed ? <span style={{ fontSize: 124, fontWeight: 700, color: pal.deep, lineHeight: 1 }}>{char}</span> : <div ref={ref} />}
+      </div>
+      {!failed && <button onClick={() => { const w = ref.current && ref.current._writer; if (w) w.animateCharacter(); }} style={{ border: "2px solid " + pal.accent, background: "transparent", color: pal.deep, borderRadius: 999, padding: "5px 14px", fontFamily: baseFont, fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>再看一次筆順</button>}
+    </div>
+  );
+}
+
+function LookupPanel({ pal, stage, onClose }) {
+  const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [res, setRes] = useState(null);
+  async function go() {
+    const t = q.trim();
+    if (!t) { setErr("輸入一個字，或像「發揮的揮」這樣告訴我。"); return; }
+    setLoading(true); setErr(""); setRes(null);
+    const r = await apiPost("/lookup", { query: t, stage });
+    if (!r.ok) setErr(r.message);
+    else if (r.data.error) setErr(r.data.error);
+    else setRes(r.data);
+    setLoading(false);
+  }
+  function speak() {
+    if (typeof window === "undefined" || !window.speechSynthesis || !res) return;
+    const u = new SpeechSynthesisUtterance(`${res.char}。${(res.words && res.words[0]) || ""}。${res.meaning}`);
+    const v = chooseZhVoice(); if (v) { u.voice = v; u.lang = v.lang || "zh-TW"; } else { u.lang = "zh-TW"; }
+    u.rate = 0.9; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+  }
+  const input = { flex: 1, minWidth: 0, border: "2px solid " + pal.border, borderRadius: 12, padding: "9px 11px", fontFamily: baseFont, fontSize: 16, color: pal.deep, background: pal.surface };
+  return (
+    <div style={{ background: pal.surface, border: "2px solid " + pal.accent, borderRadius: 18, padding: 14, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <div style={{ fontWeight: 900, fontSize: 15, color: pal.deep }}>查字小幫手</div>
+        <button onClick={onClose} title="關閉" style={{ border: "none", background: "transparent", color: pal.muted, cursor: "pointer", fontSize: 18, fontWeight: 900, lineHeight: 1 }}>✕</button>
+      </div>
+      <div style={{ fontSize: 13, color: pal.muted, lineHeight: 1.6, marginBottom: 10 }}>想知道某個字怎麼寫？輸入那個字，或像「發揮的揮」這樣告訴我，會出現讀音和大大的寫法。</div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") go(); }} placeholder="例如：發揮的揮" style={input} />
+        <MicButton value={q} setValue={setQ} pal={pal} />
+        <button onClick={go} disabled={loading} style={{ border: "none", background: pal.accent, color: pal.onAccent, borderRadius: 12, padding: "9px 16px", fontFamily: baseFont, fontWeight: 800, cursor: "pointer", opacity: loading ? 0.6 : 1, whiteSpace: "nowrap" }}>{loading ? "查…" : "查"}</button>
+      </div>
+      {err && <div style={{ marginTop: 8, fontSize: 13, color: pal.deep, fontWeight: 700 }}>{err}</div>}
+      {res && (
+        <div style={{ display: "flex", gap: 16, marginTop: 14, flexWrap: "wrap", alignItems: "flex-start" }}>
+          <StrokeBox char={res.char} pal={pal} />
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 30, fontWeight: 900, color: pal.deep }}>{res.zhuyin}</span>
+              <span style={{ fontSize: 15, color: pal.muted, fontWeight: 700 }}>{res.pinyin}</span>
+            </div>
+            <div style={{ fontSize: 13.5, color: pal.muted, fontWeight: 700, marginTop: 4 }}>部首：{res.radical}　筆畫：{res.strokes}</div>
+            <div style={{ fontSize: 15, color: pal.deep, lineHeight: 1.7, marginTop: 8 }}>{res.meaning}</div>
+            {Array.isArray(res.words) && res.words.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                {res.words.map((w, i) => (<span key={i} style={{ background: pal.soft, color: pal.deep, borderRadius: 999, padding: "4px 12px", fontSize: 13.5, fontWeight: 700 }}>{w}</span>))}
+              </div>
+            )}
+            {(typeof window !== "undefined" && window.speechSynthesis) && (
+              <button onClick={speak} style={{ marginTop: 10, border: "2px solid " + pal.accent, background: "transparent", color: pal.deep, borderRadius: 999, padding: "5px 14px", fontFamily: baseFont, fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>念給你聽</button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

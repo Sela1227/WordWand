@@ -11,7 +11,7 @@ WordWand (作文魔法屋) - 後端代理 (FastAPI)
   4. 速率限制：同一 IP 每分鐘上限，保護 API 額度（V0.3.0，記憶體版，單一 replica 有效）。
 """
 
-VERSION = "V0.19.0"
+VERSION = "V0.20.0"
 
 import os
 import json
@@ -62,9 +62,10 @@ def _rate_limited(ip: str) -> bool:
         return True
     recent.append(now)
     _hits[ip] = recent
-    # 機會性清理：避免長期累積空清單
+    # 機會性清理：依「最後一次請求是否已超出視窗」判斷，真正清掉不再回來的舊 IP（審核 P1-2）
     if len(_hits) > 5000:
-        for k in [k for k, v in _hits.items() if not v]:
+        stale = [k for k, v in _hits.items() if not v or (now - v[-1]) >= RATE_LIMIT_WINDOW]
+        for k in stale:
             _hits.pop(k, None)
     return False
 
@@ -166,11 +167,97 @@ class MagicRequest(BaseModel):
     stage: str = "es"
     theme: str = "cute"
     text: str
+    context: str = ""   # 選填：題目/段落/已有點子等背景（審核 四-2），不算在 200 字內
 
 
 class ImageRequest(BaseModel):
     image_base64: str
     media_type: str = "image/jpeg"
+
+
+class LookupRequest(BaseModel):
+    query: str
+    stage: str = "es"
+
+
+def _nonempty(x) -> bool:
+    return isinstance(x, str) and x.strip() != ""
+
+
+def validate_magic_output(mode: str, data) -> str | None:
+    """各模式輸出契約驗證（審核 P0-1）。回傳 None 表示通過，否則回傳不通過原因。"""
+    if not isinstance(data, dict):
+        return "not a dict"
+    if data.get("ok") is False:
+        return None if _nonempty(data.get("redirect")) else "redirect missing"
+    if data.get("ok") is not True:
+        return "ok missing"
+    if not _nonempty(data.get("cheer")):
+        return "cheer missing"
+    items = data.get("items")
+    qs = data.get("questions")
+
+    def items_ok(min_n: int) -> bool:
+        if not isinstance(items, list) or len(items) < min_n:
+            return False
+        return all(isinstance(it, dict) and _nonempty(it.get("word")) and _nonempty(it.get("meaning")) for it in items)
+
+    if mode == "idiom":
+        if not _nonempty(data.get("upgraded")):
+            return "upgraded missing"
+        if not items_ok(1):
+            return "items invalid"
+    elif mode == "grow":
+        if not isinstance(qs, list) or len(qs) < 2 or not all(_nonempty(q) for q in qs):
+            return "questions invalid"
+    elif mode == "outline":
+        if not items_ok(3):
+            return "outline items invalid"
+        words = [it.get("word", "") for it in items]
+        if not all(any(k in w for w in words) for k in ("開頭", "經過", "結尾")):
+            return "outline sections missing"
+    elif mode in ("gym", "senses", "ideas", "argue"):
+        if not items_ok(1):
+            return "items invalid"
+    else:
+        return "unknown mode"
+    return None
+
+
+def validate_lookup_output(data) -> str | None:
+    if not isinstance(data, dict):
+        return "not a dict"
+    if _nonempty(data.get("error")):
+        return None
+    ch = data.get("char")
+    if not (isinstance(ch, str) and len(ch) == 1 and "\u4e00" <= ch <= "\u9fff"):
+        return "char invalid"
+    for k in ("zhuyin", "pinyin", "meaning"):
+        if not _nonempty(data.get(k)):
+            return f"{k} missing"
+    if not isinstance(data.get("strokes"), int):
+        return "strokes invalid"
+    if not isinstance(data.get("words"), list):
+        return "words invalid"
+    return None
+
+
+async def _call_claude(system, user_msg: str, max_tokens: int = 1000):
+    """共用：呼叫 Claude 並回 (parsed_json | None, raw_text)。system 可為字串或 content blocks 陣列。"""
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": MODEL, "max_tokens": max_tokens, "system": system, "messages": [{"role": "user", "content": user_msg}]},
+        )
+    if r.status_code != 200:
+        raise HTTPException(502, "AI 服務暫時無法回應，請稍後再試")
+    raw = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
+    raw = raw.replace("```json", "").replace("```", "").strip()
+    try:
+        return json.loads(raw), raw
+    except json.JSONDecodeError:
+        return None, raw
 
 
 @app.get("/")
@@ -190,6 +277,7 @@ async def magic(req: MagicRequest, request: Request):
     if not text or len(text) > 200:
         raise HTTPException(400, "句子長度需介於 1～200 字")
 
+    context = (req.context or "").strip()[:600]
     theme_tone = THEME_TONE.get(req.theme, "")
     user_msg = (
         "請處理這次請求,套用上面規則手冊中對應的設定:\n"
@@ -197,40 +285,53 @@ async def magic(req: MagicRequest, request: Request):
         f"- 精靈: [{req.spirit}]（用此精靈的個性與語氣）\n"
         f"- 模式: [{req.mode}]（執行此模式的任務,並用此模式的 JSON 格式輸出）\n"
         f"- 風格語感: [{req.theme}]" + ("（輕微套用）\n" if theme_tone else "（無,維持自然）\n")
+        + (f"背景參考（學生的作文題目/所在段落/已有點子，只供理解脈絡，不要照抄）:{context}\n" if context else "")
         + f"學生的輸入:「{text}」"
     )
+    # 固定規則手冊放 system 並標記快取（每次相同 → 命中時輸入便宜約 90%）
+    system = [{"type": "text", "text": RULEBOOK, "cache_control": {"type": "ephemeral"}}]
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": MODEL,
-                "max_tokens": 1000,
-                # 固定規則手冊放 system 並標記快取（每次相同 → 命中時輸入便宜約 90%）
-                "system": [{"type": "text", "text": RULEBOOK, "cache_control": {"type": "ephemeral"}}],
-                "messages": [{"role": "user", "content": user_msg}],
-            },
-        )
-    if r.status_code != 200:
-        raise HTTPException(502, "AI 服務暫時無法回應")
+    data, raw = await _call_claude(system, user_msg)
+    reason = validate_magic_output(req.mode, data)
+    if reason:
+        # 格式不符：最多重試一次，明確要求嚴格依該模式格式輸出（審核 P0-1）
+        retry_msg = user_msg + f"\n\n【格式提醒】上一次輸出不符合 [{req.mode}] 的 JSON 格式（{reason}）。請嚴格只回傳該模式規定的 JSON 物件，欄位齊全、不要多餘文字。"
+        data, raw = await _call_claude(system, retry_msg)
+        reason = validate_magic_output(req.mode, data)
+        if reason:
+            raise HTTPException(502, "AI 回傳的內容不完整，請再按一次試試看")
 
-    raw = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
-    raw = raw.replace("```json", "").replace("```", "").strip()
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        raise HTTPException(502, "AI 回傳格式有誤，請再試一次")
+    # 通過驗證：ok=false 即為溫柔引導；ok=true 內容已符合該模式契約
+    if data.get("ok") is False:
+        return {"ok": False, "redirect": data["redirect"]}
+    return data
 
-    # 後端再保險一次：非明確 ok=true 一律當不通過，回安全引導語（fail-safe）
-    if not isinstance(data, dict) or data.get("ok") is not True:
-        fallback = "我們在作文魔法屋只幫你做寫作練習喔！請給我一句你想練習的句子吧！"
-        redirect = data.get("redirect") if isinstance(data, dict) else fallback
-        return {"ok": False, "redirect": redirect or fallback}
+
+LOOKUP_SYSTEM = (
+    "你是學生的中文查字小幫手。學生會輸入一個中文字，或像「發揮的揮」這樣的描述。"
+    "請找出要查的『那一個字』（若是「X的Y」，目標是 Y；若輸入多個字，取最後一個字）。"
+    "只回傳一個 JSON 物件，不要任何說明或 markdown："
+    '{"char":"那一個字","zhuyin":"注音（台灣標準，含聲調符號）","pinyin":"漢語拼音（含聲調）","radical":"部首",'
+    '"strokes":總筆畫數（整數）,"meaning":"用學生聽得懂的一句話解釋這個字的意思","words":["含這個字的常用詞1","詞2","詞3"]}'
+    "。全程只用繁體中文、不用簡體。若輸入沒有中文字、或是不適合學生的字詞，只回傳 {\"error\":\"請輸入一個中文字喔！\"}。"
+)
+
+
+@app.post("/lookup")
+async def lookup(req: LookupRequest, request: Request):
+    """查字：回傳注音/拼音/部首/筆畫/意思/常用詞（供前端大字顯示與筆順動畫）。"""
+    if _rate_limited(_client_ip(request)):
+        raise HTTPException(429, "小精靈有點忙，請等一下再查喔！")
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(500, "伺服器尚未設定 ANTHROPIC_API_KEY")
+    q = (req.query or "").strip()
+    if not q or len(q) > 20:
+        raise HTTPException(400, "請輸入 1～20 個字，例如「揮」或「發揮的揮」")
+    data, raw = await _call_claude(LOOKUP_SYSTEM, f"學生要查:「{q}」", max_tokens=300)
+    if validate_lookup_output(data):
+        data, raw = await _call_claude(LOOKUP_SYSTEM, f"學生要查:「{q}」\n【格式提醒】請嚴格只回傳規定的 JSON。", max_tokens=300)
+        if validate_lookup_output(data):
+            raise HTTPException(502, "查字結果不完整，請再查一次")
     return data
 
 

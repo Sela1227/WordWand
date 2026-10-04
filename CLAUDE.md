@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.19.0
+- **版本:** V0.20.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** AI 作文練習小幫手,主打國小、可切國中/高中;六~七種寫作模式 + 三精靈 + 分齡安全;英文品牌 WordWand、中文名作文魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -185,6 +185,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 | V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
 | V0.8.0 | 加學段切換(國小/國中/高中,預設國小):紅線全齡通用、題材/用字隨學段放寬、「只做寫作練習」scope 全齡不變;國中/高中多開「議論小教練」;模式依學段過濾顯示 |
+| V0.20.0 | 外部審核修正 + 查字:P0-1 各模式輸出契約驗證(validate_magic_output,不符重試一次後 502)、P0-2 計畫板依學段分 key + 換身分詢問保留/清除、P1-1 共用 apiPost 區分 400/429/5xx/網路 + 全輸入 200 字計數擋送、P1-2 rate-limit 過期 IP 真正清理、P1-5 OCR>200 立刻提示、四-2 接著想帶題目/段落/已有點子 context、四-3 刪除可復原、四-4 暫存措辭、六-2 CDN 鎖精確版本、六-3 README/handoff 同步、七 新增 tests/test_schema.py;新增查字小幫手(/lookup + StrokeBox 田字格筆順,第二層工具不加分頁) |
 | V0.19.0 | 計畫板加「整篇總覽」頁:步驟軌跡(訂題目→想靈感→分段整理→照著寫,依資料勾選)、題目、開頭/經過/結尾編號卡+箭頭流程、每段點子、空段提示、回去修改/複製整篇大綱/念給你聽;chooseZhVoice 提到全域供共用 |
 | V0.18.2 | 語音輸入抽成共用 `MicButton`;補上「作文題目」與各段「請精靈幫這段」輸入的語音(整個計畫板都能用說的);段落點子麥克風改用同元件 |
 | V0.18.1 | 精靈切換(原「切換教練」)移到最上面(與年級/風格同區,主要按鈕之前),標籤改「精靈」;移出 ww-body 後計畫板模式也能換精靈 |
@@ -208,6 +209,8 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 
 ## 七、下版候選工作(按優先序)
 
+> 外部審核「下一階段」待辦(V0.20.0 記錄):(a) 獨立 moderation 層 + 對抗性安全回歸測試集;(b) 前端拆檔或轉 build pipeline(index.html 已逾 1000 行);(c) 統一 magic request hook(apiPost 已做一半,loading/retry/cancel 尚未);(d) X-Forwarded-For 部署實測;(e) 中學通行碼存廢評估(P2-3);(f) 不再增加第一層分頁(P2-1)。
+
 > 設計原則(訓練作文能力):優先做「教學/鷹架型」功能(引導、提示、講原因),少做「代寫型」功能,否則只是給答案、訓練不到能力,也可能變成代寫工具。句子健身房/長大屋(V0.4.0)是此原則的落地。
 
 1. **國小也加主題快捷選單** — 靈感發想/大綱規劃的輸入是一個詞,給常見題目鈕用點的不用打(中學議論已有議題類別,國小可比照給適齡題目)。
@@ -221,10 +224,23 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 
 ## 八、升版必讀(如有)
 
+### V0.20.0 外部審核修正(維護重點)
+
+- **AI 輸出契約**:`validate_magic_output(mode, data)` 是純函式,新增/改 mode 時務必同步更新它與 `tests/test_schema.py`。流程:呼叫 → 驗證 → 不符則帶格式提醒重試一次 → 仍不符回 502「內容不完整,請再試」。**不要再把「只有 ok=true」當成功**。
+- **安全描述請誠實**:這是「同一模型依規則判斷 ok + 後端 fail-closed + 契約驗證」,不是獨立 moderation(審核 P1-4)。大量公開前,下版候選應加獨立輸入/輸出檢查與對抗性回歸測試集。
+- **共用請求**:前端一律用 `apiPost(path, body)`(讀 FastAPI `detail`,400/429/5xx/網路各自訊息)、字數用 `MAX_CHARS`/`lenMsg`。新輸入框照套,不要再各自 fetch。
+- **context 欄位**:`/magic` 的 `context`(≤600 字,不計入 200 字)只供脈絡,prompt 已註明「不要照抄」。計畫板 helper 會帶「題目/段落/已有點子」。
+- **X-Forwarded-For 信任邊界(審核 P1-3,未實測)**:目前取 XFF 第一個值;若 Railway 不清洗 client 自帶的 XFF,限流可被假 IP 繞過。**需在部署環境實測**(用 curl 帶假 XFF 看限流是否仍以真實 IP 計)。確認前視為已知風險。
+- **CDN 已鎖精確版本**(react 18.3.1 / react-dom 18.3.1 / @babel/standalone 7.29.9 / hanzi-writer 3.7.3);`sw.js` 預快取清單同步。升級要兩處一起改。
+- **查字**:`/lookup` 走 `LOOKUP_SYSTEM` + `validate_lookup_output`;前端 `StrokeBox` 用 HanziWriter(資料自 jsdelivr 的 hanzi-writer-data),失敗退回純大字,不會壞。
+- **測試**:`pip install -r requirements.txt pytest && pytest -q`(tests/test_schema.py:契約驗證 + rate-limit 清理)。
+
+
+
 ### V0.15.0 寫作計畫板(結構與注意)
 
 - 「board」是特殊互動模式,不是一次性 AI 呼叫:mode==="board" 時 Tool 用 `<Board/>` 取代整個雙欄輸入/結果區(上方 topBar/switcher/tabs 仍在)。
-- 狀態存 localStorage(key `wordwand_board_v1`,只存一份 {topic, sections})。與 SW 快取獨立,持久。清空 = `window.confirm` 後清空。
+- 狀態存 localStorage,**依學段分 key**:`wordwand_board_v2_<stage>`(V0.20.0,審核 P0-2),內容 {topic, sections}。「換身分」若任一學段有內容會 confirm:確定=保留、取消=清除全部計畫(`clearAllBoards`)。與 SW 快取獨立。刪除點子有 7 秒復原(`undo` state)。
 - 每段的「請精靈幫這段」自己呼叫 `/magic`(帶當前 spirit/stage/theme + 選定 mode),結果用 `boardResultLines` 攤平成可「＋加入」的行。可用魔法清單 = `BOARD_HELPERS`。
 - 固定三段 `BOARD_SECTIONS`;要改成可自訂段落(中學)是下一步候選。
 - 預設分頁已改成 board(落地即看到組織工具)。
