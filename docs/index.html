@@ -68,7 +68,7 @@
 <script type="text/babel">
 const { useState, useRef, useEffect } = React;
 
-const VERSION = "V0.18.2";
+const VERSION = "V0.19.0";
 
 /* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";
@@ -300,6 +300,19 @@ function Gate({ onEnter }) {
 }
 
 /* ---------- 主工具 ---------- */
+function chooseZhVoice() {
+  if (typeof window === "undefined" || !window.speechSynthesis) return null;
+  const vs = window.speechSynthesis.getVoices() || [];
+  // 1) 明確的台灣中文語音(lang=zh-TW 或名稱含臺灣/台灣/國語)
+  const tw = vs.filter((v) => /zh[-_]?TW/i.test(v.lang || "") || /(臺灣|台灣|Taiwan|國語)/i.test(v.name || ""));
+  // 2) 已知好聽的台灣語音名稱優先
+  const prefer = ["美佳", "美嘉", "Meijia", "雅婷", "Yating", "漢漢", "Hanhan", "國語（臺灣）", "國語(臺灣)", "Google 國語"];
+  for (const n of prefer) { const hit = tw.find((v) => (v.name || "").includes(n)); if (hit) return hit; }
+  if (tw[0]) return tw[0];
+  // 3) 退而求其次:香港中文 → 任何中文(至少別亂念)
+  return vs.find((v) => /zh[-_]?HK/i.test(v.lang || "")) || vs.find((v) => /^zh/i.test(v.lang || "")) || null;
+}
+
 function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
   const [spiritKey, setSpiritKey] = useState("nini");
   const [mode, setMode] = useState("board");
@@ -414,19 +427,6 @@ function Tool({ audience, stage, setStage, theme, setTheme, onExit }) {
     window.speechSynthesis.onvoiceschanged = warm;
     return () => { try { window.speechSynthesis.onvoiceschanged = null; } catch(_){} };
   }, []);
-
-  function chooseZhVoice() {
-    if (typeof window === "undefined" || !window.speechSynthesis) return null;
-    const vs = window.speechSynthesis.getVoices() || [];
-    // 1) 明確的台灣中文語音(lang=zh-TW 或名稱含臺灣/台灣/國語)
-    const tw = vs.filter((v) => /zh[-_]?TW/i.test(v.lang || "") || /(臺灣|台灣|Taiwan|國語)/i.test(v.name || ""));
-    // 2) 已知好聽的台灣語音名稱優先
-    const prefer = ["美佳", "美嘉", "Meijia", "雅婷", "Yating", "漢漢", "Hanhan", "國語（臺灣）", "國語(臺灣)", "Google 國語"];
-    for (const n of prefer) { const hit = tw.find((v) => (v.name || "").includes(n)); if (hit) return hit; }
-    if (tw[0]) return tw[0];
-    // 3) 退而求其次:香港中文 → 任何中文(至少別亂念)
-    return vs.find((v) => /zh[-_]?HK/i.test(v.lang || "")) || vs.find((v) => /^zh/i.test(v.lang || "")) || null;
-  }
 
   function toggleSpeak() {
     if(typeof window==="undefined"||!window.speechSynthesis||!result) return;
@@ -727,6 +727,8 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
   const [pool, setPool] = useState([]);
   const [poolLoading, setPoolLoading] = useState(false);
   const [poolErr, setPoolErr] = useState("");
+  const [view, setView] = useState("edit");
+  const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => {
     try {
@@ -755,6 +757,26 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
   }
   function addFromPool(sec, idx) { add(sec, pool[idx]); setPool((p) => p.filter((_, j) => j !== idx)); }
 
+  const totalIdeas = BOARD_SECTIONS.reduce((n, sec) => n + (sections[sec] || []).length, 0);
+  const steps = [
+    { label: "訂題目", done: !!topic.trim() },
+    { label: "想靈感", done: totalIdeas > 0 },
+    { label: "分段整理", done: BOARD_SECTIONS.every((sec) => (sections[sec] || []).length > 0) },
+    { label: "照著寫文章", done: false },
+  ];
+
+  function stopSpeak() { if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel(); setSpeaking(false); }
+  function speakOverview() {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    if (speaking) { stopSpeak(); return; }
+    const parts = ["題目:" + (topic || "還沒填")];
+    BOARD_SECTIONS.forEach((sec) => { const its = sections[sec] || []; parts.push(sec + ":" + (its.length ? its.join("。") : "還沒有點子")); });
+    const u = new SpeechSynthesisUtterance(parts.join("。"));
+    const v = chooseZhVoice(); if (v) { u.voice = v; u.lang = v.lang || "zh-TW"; } else { u.lang = "zh-TW"; }
+    u.rate = 0.95; u.onend = () => setSpeaking(false); u.onerror = () => setSpeaking(false);
+    window.speechSynthesis.cancel(); setSpeaking(true); window.speechSynthesis.speak(u);
+  }
+
   function clearAll() {
     if (window.confirm("確定要清空整份計畫嗎?清掉就回不來囉!")) {
       setTopic(""); setSections({ "開頭": [], "經過": [], "結尾": [] });
@@ -774,6 +796,57 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
   }
 
   const topInput = { flex: 1, minWidth: 0, border: "2px solid " + pal.border, borderRadius: 14, padding: "12px 14px", fontFamily: baseFont, fontSize: 17, fontWeight: 700, color: pal.deep, background: pal.surface };
+
+  const btnPrimary = { flex: 1, minWidth: 150, border: "none", background: pal.accent, color: pal.onAccent, borderRadius: 14, padding: "12px", fontFamily: baseFont, fontWeight: 800, fontSize: 15, cursor: "pointer" };
+  const btnOutline = { border: "2px solid " + pal.accent, background: pal.surface, color: pal.deep, borderRadius: 14, padding: "12px 16px", fontFamily: baseFont, fontWeight: 700, fontSize: 14, cursor: "pointer" };
+  const btnMuted = { border: "2px solid " + pal.border, background: pal.surface, color: pal.muted, borderRadius: 14, padding: "12px 16px", fontFamily: baseFont, fontWeight: 700, fontSize: 14, cursor: "pointer" };
+
+  if (view === "overview") return (
+    <div>
+      <div style={{ background: pal.soft, borderRadius: 18, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontWeight: 900, fontSize: 15, color: pal.deep, marginBottom: 8 }}>整篇總覽・你走到哪一步了</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+          {steps.map((st, i) => (
+            <React.Fragment key={i}>
+              <span style={{ fontSize: 12.5, fontWeight: 800, padding: "4px 10px", borderRadius: 999, background: st.done ? pal.accent : pal.surface, color: st.done ? pal.onAccent : pal.muted, border: "2px solid " + (st.done ? pal.accent : pal.border) }}>{st.done ? "✓ " : ""}{st.label}</span>
+              {i < steps.length - 1 && <span style={{ color: pal.muted, fontWeight: 900 }}>→</span>}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: pal.muted, margin: "0 4px 2px" }}>題目</div>
+      <div style={{ fontSize: 21, fontWeight: 900, color: pal.deep, padding: "4px 4px 14px" }}>{topic || "(還沒填題目)"}</div>
+
+      {BOARD_SECTIONS.map((sec, idx) => (
+        <React.Fragment key={sec}>
+          <div style={{ background: pal.surface, border: "2px solid " + pal.border, borderRadius: 18, padding: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 999, background: pal.accent, color: pal.onAccent, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>{idx + 1}</div>
+              <div style={{ fontWeight: 900, fontSize: 16, color: pal.deep }}>{sec}</div>
+            </div>
+            {(sections[sec] || []).length ? (sections[sec].map((it, i) => (
+              <div key={i} style={{ display: "flex", gap: 8, fontSize: 14.5, lineHeight: 1.7, color: pal.deep }}><span style={{ color: pal.accent, fontWeight: 900 }}>・</span><span>{it}</span></div>
+            ))) : (<div style={{ fontSize: 13, color: pal.muted }}>這段還沒有點子,回去加一些吧。</div>)}
+          </div>
+          {idx < BOARD_SECTIONS.length - 1 && <div style={{ textAlign: "center", color: pal.muted, fontWeight: 900, fontSize: 18, padding: "4px 0" }}>↓</div>}
+        </React.Fragment>
+      ))}
+
+      <div style={{ marginTop: 14, background: pal.soft, borderRadius: 14, padding: "12px 14px", fontSize: 13.5, lineHeight: 1.7, color: pal.deep, fontWeight: 700 }}>
+        照著 開頭 → 經過 → 結尾 的順序,把每一段的點子寫成完整的句子,你的文章就完成了!
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+        <button onClick={() => { stopSpeak(); setView("edit"); }} style={btnOutline}>← 回去修改</button>
+        <button onClick={copyAll} style={btnPrimary}>複製整篇大綱</button>
+        {(typeof window !== "undefined" && window.speechSynthesis) && (
+          <button onClick={speakOverview} style={{ ...btnOutline, background: speaking ? pal.accent : pal.surface, color: speaking ? pal.onAccent : pal.deep, animation: speaking ? "pulse 1.2s ease-in-out infinite" : "none" }}>{speaking ? "停止" : "念給你聽"}</button>
+        )}
+      </div>
+      {msg && <div style={{ marginTop: 10, fontSize: 13.5, fontWeight: 700, color: pal.deep }}>{msg}</div>}
+    </div>
+  );
 
   return (
     <div>
@@ -809,8 +882,9 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
         <SectionBlock key={sec} sec={sec} items={sections[sec]} onAdd={(t) => add(sec, t)} onDel={(i) => del(sec, i)} pal={pal} stage={stage} spiritKey={spiritKey} theme={theme} isMid={isMid} />
       ))}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
-        <button onClick={copyAll} style={{ flex: 1, minWidth: 160, border: "none", background: pal.accent, color: pal.onAccent, borderRadius: 14, padding: "12px", fontFamily: baseFont, fontWeight: 800, fontSize: 15, cursor: "pointer" }}>複製整份計畫</button>
-        <button onClick={clearAll} style={{ border: "2px solid " + pal.border, background: pal.surface, color: pal.muted, borderRadius: 14, padding: "12px 16px", fontFamily: baseFont, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>清空</button>
+        <button onClick={() => setView("overview")} style={btnPrimary}>看整篇總覽</button>
+        <button onClick={copyAll} style={btnOutline}>複製整份計畫</button>
+        <button onClick={clearAll} style={btnMuted}>清空</button>
       </div>
       {msg && <div style={{ marginTop: 10, fontSize: 13.5, fontWeight: 700, color: pal.deep }}>{msg}</div>}
     </div>

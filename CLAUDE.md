@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V0.18.2
+- **版本:** V0.19.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** AI 作文練習小幫手,主打國小、可切國中/高中;六~七種寫作模式 + 三精靈 + 分齡安全;英文品牌 WordWand、中文名作文魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -185,6 +185,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 | V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
 | V0.8.0 | 加學段切換(國小/國中/高中,預設國小):紅線全齡通用、題材/用字隨學段放寬、「只做寫作練習」scope 全齡不變;國中/高中多開「議論小教練」;模式依學段過濾顯示 |
+| V0.19.0 | 計畫板加「整篇總覽」頁:步驟軌跡(訂題目→想靈感→分段整理→照著寫,依資料勾選)、題目、開頭/經過/結尾編號卡+箭頭流程、每段點子、空段提示、回去修改/複製整篇大綱/念給你聽;chooseZhVoice 提到全域供共用 |
 | V0.18.2 | 語音輸入抽成共用 `MicButton`;補上「作文題目」與各段「請精靈幫這段」輸入的語音(整個計畫板都能用說的);段落點子麥克風改用同元件 |
 | V0.18.1 | 精靈切換(原「切換教練」)移到最上面(與年級/風格同區,主要按鈕之前),標籤改「精靈」;移出 ww-body 後計畫板模式也能換精靈 |
 | V0.18.0 | 計畫板每條點子加「✦ 接著想」:把該句帶進「請精靈幫這段」並預設魔法長大樹,讓精靈接著既有點子繼續引導擴寫 |
@@ -227,6 +228,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 - 每段的「請精靈幫這段」自己呼叫 `/magic`(帶當前 spirit/stage/theme + 選定 mode),結果用 `boardResultLines` 攤平成可「＋加入」的行。可用魔法清單 = `BOARD_HELPERS`。
 - 固定三段 `BOARD_SECTIONS`;要改成可自訂段落(中學)是下一步候選。
 - 預設分頁已改成 board(落地即看到組織工具)。
+- (V0.19.0)Board 有 `view` state:edit / overview。總覽頁純讀,由 topic/sections 即時組出;`steps` 依資料判斷完成度。朗讀用全域 `chooseZhVoice`。
 
 ### V0.14.1 桌機橫式雙欄(結構)
 
