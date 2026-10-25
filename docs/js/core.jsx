@@ -7,7 +7,7 @@
 
 const { useState, useRef, useEffect } = React;
 
-const VERSION = "V1.2.0";
+const VERSION = "V1.3.0";
 
 /* ★ 你的 Railway 後端網址 */
 const BACKEND_URL = "https://wordwand-production-2a37.up.railway.app";

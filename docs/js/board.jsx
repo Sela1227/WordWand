@@ -60,8 +60,9 @@ function MicButton({ value, setValue, pal }) {
   );
 }
 
-function SectionBlock({ sec, items, onAdd, onDel, pal, stage, spiritKey, theme, isMid, topic }) {
+function SectionBlock({ sec, items, onAdd, onDel, onMove, onReorder, pal, stage, spiritKey, theme, isMid, topic }) {
   const [draft, setDraft] = useState("");
+  const [sel, setSel] = useState(null);   // 目前點選的點子(動作列)
   const [open, setOpen] = useState(false);
   const [hmode, setHmode] = useState("ideas");
   const [hinput, setHinput] = useState("");
@@ -91,13 +92,27 @@ function SectionBlock({ sec, items, onAdd, onDel, pal, stage, spiritKey, theme, 
     <div style={box}>
       <div style={{ fontWeight: 900, fontSize: 16, color: pal.deep, marginBottom: 8 }}>{sec}</div>
       {items.length === 0 && <div style={{ fontSize: 13, color: pal.muted, marginBottom: 8 }}>還沒有點子。在下面加,或請精靈幫你想。</div>}
-      {items.map((it, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, background: pal.soft, borderRadius: 12, padding: "8px 10px", marginBottom: 6 }}>
-          <span style={{ flex: 1, fontSize: 14.5, lineHeight: 1.6, color: pal.deep }}>{it}</span>
-          <button onClick={() => { setOpen(true); setHmode("grow"); setHinput(it); setHres(null); setHerr(""); }} title="讓精靈接著這一條繼續引導你" style={{ border: "2px solid " + pal.accent, background: "transparent", color: pal.deep, borderRadius: 999, padding: "3px 10px", fontFamily: baseFont, fontWeight: 700, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>✦ 接著想</button>
-          <button onClick={() => onDel(i)} title="刪除" style={{ border: "none", background: "transparent", color: pal.muted, cursor: "pointer", fontSize: 16, fontWeight: 900, lineHeight: 1 }}>✕</button>
-        </div>
-      ))}
+      {items.length > 0 && <div style={{ fontSize: 12, color: pal.muted, marginBottom: 6 }}>點一下點子，可以接著想、移到別段、調順序或刪除。</div>}
+      {items.map((it, i) => {
+        const on = sel === i;
+        const actBtn = (filled) => ({ border: "2px solid " + pal.accent, background: filled ? pal.accent : "transparent", color: filled ? pal.onAccent : pal.deep, borderRadius: 999, padding: "4px 11px", fontFamily: baseFont, fontWeight: 700, fontSize: 12.5, cursor: "pointer", whiteSpace: "nowrap" });
+        return (
+          <div key={i} style={{ background: pal.soft, border: "2px solid " + (on ? pal.accent : "transparent"), borderRadius: 12, padding: "8px 10px", marginBottom: 6 }}>
+            <div onClick={() => setSel(on ? null : i)} style={{ fontSize: 14.5, lineHeight: 1.6, color: pal.deep, cursor: "pointer" }}>{it}</div>
+            {on && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                <button onClick={() => { setOpen(true); setHmode("grow"); setHinput(it); setHres(null); setHerr(""); setSel(null); }} style={actBtn(false)}>✦ 接著想</button>
+                {BOARD_SECTIONS.filter((s) => s !== sec).map((s) => (
+                  <button key={s} onClick={() => { onMove(i, s); setSel(null); }} style={actBtn(true)}>移到{s}</button>
+                ))}
+                {i > 0 && <button onClick={() => { onReorder(i, -1); setSel(i - 1); }} style={actBtn(false)}>上移</button>}
+                {i < items.length - 1 && <button onClick={() => { onReorder(i, 1); setSel(i + 1); }} style={actBtn(false)}>下移</button>}
+                <button onClick={() => { onDel(i); setSel(null); }} style={{ ...actBtn(false), border: "2px solid " + pal.border, color: pal.muted }}>刪除</button>
+              </div>
+            )}
+          </div>
+        );
+      })}
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
         <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { onAdd(draft); setDraft(""); } }} placeholder="加一個點子…" style={miniInput} />
         <MicButton value={draft} setValue={setDraft} pal={pal} />
@@ -160,6 +175,17 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
     if (undoTimer.current) clearTimeout(undoTimer.current);
     undoTimer.current = setTimeout(() => setUndo(null), 7000);
   };
+  // 跨段移動(加到目標段最後)與段內排序(V1.3.0)
+  const move = (fromSec, i, toSec) => setSections((s) => {
+    const item = s[fromSec][i]; if (item === undefined) return s;
+    return { ...s, [fromSec]: s[fromSec].filter((_, j) => j !== i), [toSec]: [...s[toSec], item] };
+  });
+  const reorder = (sec, i, dir) => setSections((s) => {
+    const arr = [...s[sec]]; const j = i + dir;
+    if (j < 0 || j >= arr.length) return s;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    return { ...s, [sec]: arr };
+  });
   const undoDelete = () => {
     if (!undo) return;
     setSections((s) => { const arr = [...s[undo.sec]]; arr.splice(Math.min(undo.i, arr.length), 0, undo.item); return { ...s, [undo.sec]: arr }; });
@@ -303,7 +329,7 @@ function Board({ pal, stage, spiritKey, theme, isMid }) {
 
       <div style={{ fontWeight: 900, fontSize: 15, color: pal.deep, margin: "4px 2px 8px" }}>③ 排進段落・把點子放到該去的地方</div>
       {BOARD_SECTIONS.map((sec) => (
-        <SectionBlock key={sec} sec={sec} items={sections[sec]} onAdd={(t) => add(sec, t)} onDel={(i) => del(sec, i)} pal={pal} stage={stage} spiritKey={spiritKey} theme={theme} isMid={isMid} topic={topic} />
+        <SectionBlock key={sec} sec={sec} items={sections[sec]} onAdd={(t) => add(sec, t)} onDel={(i) => del(sec, i)} onMove={(i, to) => move(sec, i, to)} onReorder={(i, d) => reorder(sec, i, d)} pal={pal} stage={stage} spiritKey={spiritKey} theme={theme} isMid={isMid} topic={topic} />
       ))}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
         <button onClick={() => setView("overview")} style={btnPrimary}>看整篇總覽</button>

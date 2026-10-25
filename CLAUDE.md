@@ -16,7 +16,7 @@
 
 ## 〇、當前狀態
 
-- **版本:** V1.2.0
+- **版本:** V1.3.0
 - **狀態:** 已上線並收尾(後端 Railway 運作中、前端接入正式網址、CORS 已收斂、速率限制已上)
 - **一句話定位:** AI 作文練習小幫手,主打國小、可切國中/高中;六~七種寫作模式 + 三精靈 + 分齡安全;英文品牌 WordWand、中文名作文魔法屋。
 - **技術棧:** 前端 React 18(CDN + Babel standalone,免建置)/ 後端 Python 3.10+ FastAPI 0.115 / Claude API
@@ -193,6 +193,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 | V0.6.0 | 省力輸入:語音輸入(Web Speech API,zh-TW,偵測支援才顯示)+ 拍照輸入(後端 /read-image 用 Claude 看圖 OCR,讀出文字回填讓小朋友檢查後再送) |
 | V0.7.0 | 結果加「複製給老師看」(依模式整理成純文字 + clipboard,含 execCommand fallback)、「念給你聽」(SpeechSynthesis zh-TW,iOS 也支援;送出/切換分頁會停止朗讀) |
 | V0.8.0 | 加學段切換(國小/國中/高中,預設國小):紅線全齡通用、題材/用字隨學段放寬、「只做寫作練習」scope 全齡不變;國中/高中多開「議論小教練」;模式依學段過濾顯示 |
+| V1.3.0 | 計畫板點子可重新分配:點一下點子跳出動作列(✦ 接著想 / 移到另外兩段 / 上移 / 下移 / 刪除),取代原本每條常駐的接著想與 ✕;Board 新增 move(跨段,加到目標段末)與 reorder(段內交換)。刪除仍走 7 秒復原。介面依 SELA 選定方案 B |
 | V1.2.0 | 去模版化比照到三模式:魔法長大樹(問題必須抓住該句的具體人事物,拉出畫面/動作/對話/心裡話/轉折/為什麼)、五感放大鏡(問題釘在場景的具體東西或瞬間、不必五官全問、加比較/意外型)、議論小教練(禁萬用論點、說理方式各異、必含一條「反方：」讓學生想怎麼回應)。前端 argue 標籤改「怎麼說理」 |
 | V1.1.0 | 靈感泡泡去模版化:提示詞改為「針對題目量身、喚起具體時刻、多種思考方式(最〇〇/跟平常不同/小細節/為什麼/二選一/意想不到)、只問不答」;word=思考方式標籤、meaning=具體問題;「再想一批」把上一批當 context 要求全部換新 |
 | V1.0.1 | 修查字 bug:「發揮的灰」這類語音/同音錯字,AI 依規則從詞推斷目標字(揮)並回 note 說明校正;不再輕易回 error。前端顯示「小精靈幫你看了一下:…」 |
@@ -268,6 +269,7 @@ grep -rn "console.log\|print('debug')\|TODO\|FIXME" docs backend || true
 - 狀態存 localStorage,**依學段分 key**:`wordwand_board_v2_<stage>`(V0.20.0,審核 P0-2),內容 {topic, sections}。「換身分」若任一學段有內容會 confirm:確定=保留、取消=清除全部計畫(`clearAllBoards`)。與 SW 快取獨立。刪除點子有 7 秒復原(`undo` state)。
 - 每段的「請精靈幫這段」自己呼叫 `/magic`(帶當前 spirit/stage/theme + 選定 mode),結果用 `boardResultLines` 攤平成可「＋加入」的行。可用魔法清單 = `BOARD_HELPERS`。
 - 固定三段 `BOARD_SECTIONS`;要改成可自訂段落(中學)是下一步候選。
+- (V1.3.0)SectionBlock 有 `sel` state(點選中的點子),動作列呼叫 Board 的 `move(fromSec,i,toSec)` / `reorder(sec,i,±1)`。移動目前沒有復原(只有刪除有),若小朋友常誤移再考慮加。
 - 預設分頁已改成 board(落地即看到組織工具)。
 - (V0.19.0)Board 有 `view` state:edit / overview。總覽頁純讀,由 topic/sections 即時組出;`steps` 依資料判斷完成度。朗讀用全域 `chooseZhVoice`。
 
